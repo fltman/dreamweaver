@@ -4,7 +4,6 @@ import { Volume2, VolumeX, Play, Pause } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 
 interface BackgroundMusicProps {
-  isPlaying: boolean;
   onVolumeChange?: (volume: number) => void;
   storyAudioPlaying?: boolean;
 }
@@ -28,11 +27,11 @@ const MUSIC_FILES = [
   "Untitled (15).mp3"
 ];
 
-export default function BackgroundMusic({ isPlaying, onVolumeChange, storyAudioPlaying = false }: BackgroundMusicProps) {
+export default function BackgroundMusic({ onVolumeChange, storyAudioPlaying = false }: BackgroundMusicProps) {
   const [volume, setVolume] = useState(30); // Lower default volume for background music
   const [isMuted, setIsMuted] = useState(false);
   const [currentTrack, setCurrentTrack] = useState(0);
-  const [isBackgroundPlaying, setIsBackgroundPlaying] = useState(false);
+  const [isUserPlaying, setIsUserPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // Select random starting track
@@ -40,35 +39,21 @@ export default function BackgroundMusic({ isPlaying, onVolumeChange, storyAudioP
     setCurrentTrack(Math.floor(Math.random() * MUSIC_FILES.length));
   }, []);
 
+  // Auto-pause when story audio is playing, resume when it stops
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || !isUserPlaying) return;
 
-    console.log('[BackgroundMusic] State change - isPlaying:', isPlaying, 'storyAudioPlaying:', storyAudioPlaying);
-
-    if (isPlaying && !storyAudioPlaying && !isBackgroundPlaying) {
-      console.log('[BackgroundMusic] Starting background music');
-      // Start playing immediately when story audio is not playing
-      audio.play().then(() => {
-        console.log('[BackgroundMusic] Successfully started playing');
-        setIsBackgroundPlaying(true);
-      }).catch(error => {
-        console.error('[BackgroundMusic] Failed to start:', error);
-        setIsBackgroundPlaying(false);
-      });
-    } else if (storyAudioPlaying && isBackgroundPlaying) {
+    if (storyAudioPlaying) {
       console.log('[BackgroundMusic] Pausing for story audio');
       audio.pause();
-      setIsBackgroundPlaying(false);
-    } else if (!storyAudioPlaying && isPlaying && !isBackgroundPlaying) {
-      console.log('[BackgroundMusic] Resuming background music');
-      audio.play().then(() => {
-        setIsBackgroundPlaying(true);
-      }).catch(error => {
+    } else {
+      console.log('[BackgroundMusic] Resuming after story audio');
+      audio.play().catch(error => {
         console.error('[BackgroundMusic] Failed to resume:', error);
       });
     }
-  }, [isPlaying, storyAudioPlaying]);
+  }, [storyAudioPlaying, isUserPlaying]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -82,7 +67,7 @@ export default function BackgroundMusic({ isPlaying, onVolumeChange, storyAudioP
         handleTrackEnd();
         
         // Continue playing if music was playing
-        if (isBackgroundPlaying && isPlaying && !storyAudioPlaying) {
+        if (isUserPlaying && !storyAudioPlaying) {
           setTimeout(() => {
             audio.play().then(() => {
               console.log('[BackgroundMusic] Next track started playing');
@@ -116,20 +101,26 @@ export default function BackgroundMusic({ isPlaying, onVolumeChange, storyAudioP
     setIsMuted(!isMuted);
   };
 
-  const toggleBackgroundMusic = () => {
+  const togglePlayPause = () => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (isBackgroundPlaying) {
+    if (isUserPlaying) {
+      console.log('[BackgroundMusic] User pausing music');
       audio.pause();
-      setIsBackgroundPlaying(false);
+      setIsUserPlaying(false);
     } else {
-      audio.play().then(() => {
-        setIsBackgroundPlaying(true);
-      }).catch(error => {
-        console.error('[BackgroundMusic] Manual play failed:', error);
+      console.log('[BackgroundMusic] User starting music');
+      audio.play().catch(error => {
+        console.error('[BackgroundMusic] Failed to play:', error);
       });
+      setIsUserPlaying(true);
     }
+  };
+
+  const getCurrentTrackName = () => {
+    const filename = MUSIC_FILES[currentTrack];
+    return filename.replace('.mp3', '').replace(/Untitled \((\d+)\)/, 'Track $1').replace('Untitled', 'Track 1');
   };
 
   return (
