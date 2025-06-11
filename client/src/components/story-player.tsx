@@ -26,6 +26,12 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
 
   const queryClient = useQueryClient();
 
+  // Debug logging for StoryPlayer
+  console.log('[StoryPlayer Debug] story:', story);
+  console.log('[StoryPlayer Debug] currentChapter prop:', currentChapter);
+  console.log('[StoryPlayer Debug] currentChapter exists?', !!currentChapter);
+  console.log('[StoryPlayer Debug] currentChapter.content exists?', !!currentChapter?.content);
+
 
 
   const generateChapterMutation = useMutation({

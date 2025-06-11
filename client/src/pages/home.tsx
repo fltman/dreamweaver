@@ -5,7 +5,7 @@ import StorySelector from "@/components/story-selector";
 import VoiceSelector from "@/components/voice-selector";
 import StoryPlayer from "@/components/story-player";
 import { Story, Chapter } from "@/lib/types";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function Home() {
@@ -14,21 +14,36 @@ export default function Home() {
   const [selectedVoice, setSelectedVoice] = useState<string>();
   const [currentStory, setCurrentStory] = useState<Story>();
 
-  const { data: chapters } = useQuery<Chapter[]>({
+  const { data: chapters, isLoading: chaptersLoading, error: chaptersError, isSuccess: chaptersSuccess } = useQuery<Chapter[]>({
     queryKey: ['/api/stories', currentStory?.id.toString(), 'chapters'],
     enabled: !!currentStory
   });
 
   const currentChapter = chapters?.[chapters.length - 1];
 
+  // Comprehensive logging
+  console.log('[Home Debug] currentStory:', currentStory);
+  console.log('[Home Debug] currentScreen:', currentScreen);
+  console.log('[Home Debug] chaptersLoading:', chaptersLoading);
+  console.log('[Home Debug] chaptersError:', chaptersError);
+  console.log('[Home Debug] chaptersSuccess:', chaptersSuccess);
+  console.log('[Home Debug] chapters array:', chapters);
+  console.log('[Home Debug] currentChapter:', currentChapter);
+  console.log('[Home Debug] chapters length:', chapters?.length || 0);
+
   const createStoryMutation = useMutation({
     mutationFn: async (storyData: { genre: string; voice: string; title: string }) => {
+      console.log('[CreateStory] Making API request with:', storyData);
       const response = await apiRequest('POST', '/api/stories', storyData);
-      return response.json();
+      const story = await response.json();
+      console.log('[CreateStory] API response:', story);
+      return story;
     },
     onSuccess: (story: Story) => {
+      console.log('[CreateStory] onSuccess called with story:', story);
       setCurrentStory(story);
       setCurrentScreen('player');
+      queryClient.invalidateQueries({ queryKey: ['/api/stories'] });
     }
   });
 
@@ -103,10 +118,21 @@ export default function Home() {
             onVoiceSelect={setSelectedVoice}
           />
 
+          {/* Debug Info */}
+          <div className="text-xs text-muted-foreground space-y-1 p-4 bg-muted/20 rounded-lg">
+            <div>Selected Genre: {selectedGenre || 'None'}</div>
+            <div>Selected Voice: {selectedVoice || 'None'}</div>
+            <div>Start Enabled: {isStartEnabled ? 'Yes' : 'No'}</div>
+            <div>Mutation Pending: {createStoryMutation.isPending ? 'Yes' : 'No'}</div>
+          </div>
+
           {/* Start Button */}
           <div className="pt-6">
             <Button
-              onClick={handleStartStory}
+              onClick={() => {
+                console.log('[StartButton] Clicked with genre:', selectedGenre, 'voice:', selectedVoice);
+                handleStartStory();
+              }}
               disabled={!isStartEnabled}
               size="lg"
               className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/80 hover:to-primary text-primary-foreground font-medium px-12 py-6 rounded-full text-lg transition-all duration-300 transform hover:scale-105 animate-gentle-pulse disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:animate-none"
