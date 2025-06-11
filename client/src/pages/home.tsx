@@ -39,7 +39,8 @@ export default function Home() {
       
       if (!isFullscreen && isKioskMode) {
         // User exited fullscreen manually, update state
-        document.body.style.cursor = 'auto';
+        document.body.classList.remove('kiosk-mode');
+        document.documentElement.classList.remove('kiosk-mode');
         setIsKioskMode(false);
       }
     };
@@ -144,7 +145,9 @@ export default function Home() {
       console.warn('[KioskMode] Failed to exit fullscreen:', error);
     }
     
-    document.body.style.cursor = 'auto';
+    // Remove kiosk mode styling
+    document.body.classList.remove('kiosk-mode');
+    document.documentElement.classList.remove('kiosk-mode');
     setIsKioskMode(false);
     console.log('[KioskMode] Exited kiosk mode');
   };
