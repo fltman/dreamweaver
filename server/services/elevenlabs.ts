@@ -5,9 +5,9 @@ interface ElevenLabsVoice {
 }
 
 const VOICE_MAP: Record<string, string> = {
-  sarah: "EXAVITQu4vr4xnSDxMaL", // Bella - warm and gentle
-  david: "VR6AewLTigWG4xSOukaG", // Josh - deep and soothing  
-  luna: "pNInz6obpgDQGcFmaJgB", // Adam - ethereal and dreamy
+  sarah: "BL7YSL1bAkmW8U0JnU8o", // High quality female voice
+  david: "wgHvco1wiREKN0BdyVx5", // High quality male voice  
+  luna: "BL7YSL1bAkmW8U0JnU8o", // High quality female voice
 };
 
 export async function convertTextToSpeech(
