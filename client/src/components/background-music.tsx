@@ -43,9 +43,20 @@ export default function BackgroundMusic({ isPlaying, onVolumeChange, storyAudioP
     const audio = audioRef.current;
     if (!audio) return;
 
+    console.log('[BackgroundMusic] State change - isPlaying:', isPlaying, 'storyAudioPlaying:', storyAudioPlaying);
+
     if (isPlaying && !storyAudioPlaying) {
-      audio.play().catch(console.error);
+      console.log('[BackgroundMusic] Starting background music');
+      // Small delay to ensure audio element is ready
+      setTimeout(() => {
+        audio.play().then(() => {
+          console.log('[BackgroundMusic] Successfully started playing');
+        }).catch(error => {
+          console.error('[BackgroundMusic] Failed to start:', error);
+        });
+      }, 100);
     } else {
+      console.log('[BackgroundMusic] Pausing background music');
       audio.pause();
     }
   }, [isPlaying, storyAudioPlaying]);
@@ -79,7 +90,9 @@ export default function BackgroundMusic({ isPlaying, onVolumeChange, storyAudioP
         ref={audioRef}
         loop={false}
         onEnded={handleTrackEnd}
-        preload="metadata"
+        preload="auto"
+        onLoadedData={() => console.log('[BackgroundMusic] Audio loaded')}
+        onError={(e) => console.error('[BackgroundMusic] Audio error:', e)}
       >
         <source src={`/music/${MUSIC_FILES[currentTrack]}`} type="audio/mpeg" />
       </audio>

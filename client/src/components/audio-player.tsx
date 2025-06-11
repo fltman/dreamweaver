@@ -37,8 +37,11 @@ export default function AudioPlayer({ audioUrl, onPlaybackComplete, autoPlay = f
       setDuration(audio.duration);
       if (autoPlay) {
         console.log('[AudioPlayer] Auto-playing audio');
-        audio.play();
-        setIsPlaying(true);
+        audio.play().then(() => {
+          console.log('[AudioPlayer] Auto-play started successfully');
+        }).catch(error => {
+          console.error('[AudioPlayer] Auto-play failed:', error);
+        });
       }
     };
 
@@ -104,9 +107,9 @@ export default function AudioPlayer({ audioUrl, onPlaybackComplete, autoPlay = f
     if (isPlaying) {
       audio.pause();
     } else {
-      audio.play();
+      audio.play().catch(console.error);
     }
-    setIsPlaying(!isPlaying);
+    // Don't manually set isPlaying here - let the event handlers manage it
   };
 
   const formatTime = (time: number) => {
