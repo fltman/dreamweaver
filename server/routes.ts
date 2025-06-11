@@ -160,7 +160,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/stories/:id/chapters", async (req, res) => {
     try {
       const storyId = parseInt(req.params.id);
+      console.log(`[Chapters API] Getting chapters for story ${storyId}`);
       const chapters = await storage.getChaptersByStory(storyId);
+      console.log(`[Chapters API] Found ${chapters.length} chapters`);
+      if (chapters.length > 0) {
+        console.log(`[Chapters API] First chapter keys:`, Object.keys(chapters[0]));
+        console.log(`[Chapters API] First chapter preview:`, JSON.stringify(chapters[0], null, 2).substring(0, 500));
+      }
       res.json(chapters);
     } catch (error) {
       console.error("Failed to get chapters:", error);

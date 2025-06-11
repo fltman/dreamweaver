@@ -16,8 +16,10 @@ export default function Home() {
   const queryClient = useQueryClient();
 
   const { data: chapters, isLoading: chaptersLoading, error: chaptersError, isSuccess: chaptersSuccess } = useQuery<Chapter[]>({
-    queryKey: ['/api/stories', currentStory?.id.toString(), 'chapters'],
-    enabled: !!currentStory
+    queryKey: [`/api/stories/${currentStory?.id}/chapters`],
+    enabled: !!currentStory,
+    staleTime: 0,
+    cacheTime: 0
   });
 
   const currentChapter = chapters?.[chapters.length - 1];
@@ -51,7 +53,8 @@ export default function Home() {
       console.log('[CreateStory] onSuccess called with story:', story);
       setCurrentStory(story);
       setCurrentScreen('player');
-      queryClient.invalidateQueries({ queryKey: ['/api/stories'] });
+      // Clear all cache to prevent data collision
+      queryClient.clear();
     }
   });
 
