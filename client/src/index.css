@@ -2,6 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Kiosk Mode Styles for Maximum Darkness */
+.kiosk-mode {
+  background-color: #000000 !important;
+  cursor: none !important;
+}
+
+.kiosk-mode * {
+  cursor: none !important;
+}
+
+/* Hide scrollbars in kiosk mode */
+.kiosk-mode::-webkit-scrollbar {
+  display: none;
+}
+
+.kiosk-mode {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Prevent text selection in kiosk mode */
+.kiosk-mode {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
 :root {
   --background: hsl(0, 0%, 4%);
   --foreground: hsl(0, 0%, 97%);

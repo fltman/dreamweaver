@@ -13,7 +13,47 @@ export default function Home() {
   const [selectedGenre, setSelectedGenre] = useState<string>();
   const [selectedVoice, setSelectedVoice] = useState<string>();
   const [currentStory, setCurrentStory] = useState<Story>();
+  const [isKioskMode, setIsKioskMode] = useState(false);
   const queryClient = useQueryClient();
+
+  // Handle escape key to exit kiosk mode
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isKioskMode) {
+        exitKioskMode();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isKioskMode]);
+
+  // Handle fullscreen change events
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFullscreen = !!(document.fullscreenElement || 
+        (document as any).webkitFullscreenElement || 
+        (document as any).msFullscreenElement);
+      
+      if (!isFullscreen && isKioskMode) {
+        // User exited fullscreen manually, update state
+        document.body.style.cursor = 'auto';
+        setIsKioskMode(false);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('msfullscreenchange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+    };
+  }, [isKioskMode]);
 
   const { data: chapters, isLoading: chaptersLoading, error: chaptersError } = useQuery({
     queryKey: [`/api/stories/${currentStory?.id}/chapters`],
@@ -66,8 +106,54 @@ export default function Home() {
     }
   });
 
-  const handleStartStory = () => {
+  const enterKioskMode = async () => {
+    try {
+      if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      } else if ((document.documentElement as any).webkitRequestFullscreen) {
+        await (document.documentElement as any).webkitRequestFullscreen();
+      } else if ((document.documentElement as any).msRequestFullscreen) {
+        await (document.documentElement as any).msRequestFullscreen();
+      }
+      
+      // Apply kiosk mode styling for maximum darkness
+      document.body.classList.add('kiosk-mode');
+      document.documentElement.classList.add('kiosk-mode');
+      setIsKioskMode(true);
+      
+      console.log('[KioskMode] Entered fullscreen kiosk mode');
+    } catch (error) {
+      console.warn('[KioskMode] Failed to enter fullscreen:', error);
+      // Still set kiosk mode even if fullscreen fails
+      document.body.classList.add('kiosk-mode');
+      document.documentElement.classList.add('kiosk-mode');
+      setIsKioskMode(true);
+    }
+  };
+
+  const exitKioskMode = async () => {
+    try {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        await (document as any).webkitExitFullscreen();
+      } else if ((document as any).msExitFullscreen) {
+        await (document as any).msExitFullscreen();
+      }
+    } catch (error) {
+      console.warn('[KioskMode] Failed to exit fullscreen:', error);
+    }
+    
+    document.body.style.cursor = 'auto';
+    setIsKioskMode(false);
+    console.log('[KioskMode] Exited kiosk mode');
+  };
+
+  const handleStartStory = async () => {
     if (!selectedGenre || !selectedVoice) return;
+
+    // Enter kiosk mode before starting story
+    await enterKioskMode();
 
     const title = generateStoryTitle(selectedGenre);
     
@@ -90,7 +176,10 @@ export default function Home() {
     return genreTitle[Math.floor(Math.random() * genreTitle.length)];
   };
 
-  const handleBack = () => {
+  const handleBack = async () => {
+    if (isKioskMode) {
+      await exitKioskMode();
+    }
     setCurrentScreen('welcome');
     setCurrentStory(undefined);
     setSelectedGenre(undefined);
@@ -101,11 +190,18 @@ export default function Home() {
 
   if (currentScreen === 'player' && currentStory) {
     return (
-      <StoryPlayer
-        story={currentStory}
-        currentChapter={currentChapter}
-        onBack={handleBack}
-      />
+      <div className={`min-h-screen ${isKioskMode ? 'bg-black' : ''}`}>
+        {isKioskMode && (
+          <div className="fixed top-4 right-4 z-50 bg-gray-900/80 text-white text-xs px-3 py-1 rounded-full opacity-50">
+            Kiosk Mode • Press ESC to exit
+          </div>
+        )}
+        <StoryPlayer
+          story={currentStory}
+          currentChapter={currentChapter}
+          onBack={handleBack}
+        />
+      </div>
     );
   }
 
