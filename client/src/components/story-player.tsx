@@ -44,7 +44,7 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stories', story.id.toString(), 'chapters'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stories/${story.id}/chapters`] });
     }
   });
 

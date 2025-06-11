@@ -75,8 +75,31 @@ export default function BackgroundMusic({ isPlaying, onVolumeChange, storyAudioP
     if (audio) {
       audio.volume = isMuted ? 0 : volume / 100;
       onVolumeChange?.(isMuted ? 0 : volume);
+      
+      // Add event listener for track end to auto-advance
+      const handleTrackEndEvent = () => {
+        console.log('[BackgroundMusic] Track ended, advancing to next track');
+        handleTrackEnd();
+        
+        // Continue playing if music was playing
+        if (isBackgroundPlaying && isPlaying && !storyAudioPlaying) {
+          setTimeout(() => {
+            audio.play().then(() => {
+              console.log('[BackgroundMusic] Next track started playing');
+            }).catch(error => {
+              console.error('[BackgroundMusic] Failed to play next track:', error);
+            });
+          }, 500); // Small delay to allow track change
+        }
+      };
+      
+      audio.addEventListener('ended', handleTrackEndEvent);
+      
+      return () => {
+        audio.removeEventListener('ended', handleTrackEndEvent);
+      };
     }
-  }, [volume, isMuted, onVolumeChange]);
+  }, [volume, isMuted, onVolumeChange, isBackgroundPlaying, isPlaying, storyAudioPlaying, currentTrack]);
 
   const handleTrackEnd = () => {
     // Move to next track, loop back to start when reaching end

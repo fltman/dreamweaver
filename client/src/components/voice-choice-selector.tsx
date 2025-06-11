@@ -204,6 +204,16 @@ export default function VoiceChoiceSelector({
       );
       
       if (hasKeyWords || hasNumberMatch) {
+        // Clear all timeouts when voice choice is detected
+        if (sleepTimeoutId) {
+          clearTimeout(sleepTimeoutId);
+          setSleepTimeoutId(null);
+        }
+        if (silenceTimeoutId) {
+          clearTimeout(silenceTimeoutId);
+          setSilenceTimeoutId(null);
+        }
+        
         setSelectedChoice(choice.id);
         setTimeout(() => onChoiceSelect(choice.id), 1000); // Small delay to show selection
         return;
@@ -271,6 +281,16 @@ export default function VoiceChoiceSelector({
   };
 
   const handleManualChoice = (choiceId: string) => {
+    // Clear all timeouts when user manually selects a choice
+    if (sleepTimeoutId) {
+      clearTimeout(sleepTimeoutId);
+      setSleepTimeoutId(null);
+    }
+    if (silenceTimeoutId) {
+      clearTimeout(silenceTimeoutId);
+      setSilenceTimeoutId(null);
+    }
+    
     setSelectedChoice(choiceId);
     onChoiceSelect(choiceId);
   };
