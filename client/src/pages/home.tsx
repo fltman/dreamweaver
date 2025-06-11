@@ -14,32 +14,12 @@ export default function Home() {
   const [selectedVoice, setSelectedVoice] = useState<string>();
   const [currentStory, setCurrentStory] = useState<Story>();
 
-  // Fetch the latest story if we don't have one
-  const { data: allStories } = useQuery<Story[]>({
-    queryKey: ['/api/stories'],
-    enabled: !currentStory
-  });
-
-  // Set current story from latest if available
-  useEffect(() => {
-    if (allStories && allStories.length > 0 && !currentStory) {
-      setCurrentStory(allStories[allStories.length - 1]);
-    }
-  }, [allStories, currentStory]);
-
-  const { data: chapters, isLoading: chaptersLoading, error: chaptersError } = useQuery<Chapter[]>({
+  const { data: chapters } = useQuery<Chapter[]>({
     queryKey: ['/api/stories', currentStory?.id.toString(), 'chapters'],
     enabled: !!currentStory
   });
 
   const currentChapter = chapters?.[chapters.length - 1];
-  
-  // Debug logging
-  console.log('Home - currentStory:', currentStory);
-  console.log('Home - chapters:', chapters);
-  console.log('Home - currentChapter:', currentChapter);
-  console.log('Home - chaptersLoading:', chaptersLoading);
-  console.log('Home - chaptersError:', chaptersError);
 
   const createStoryMutation = useMutation({
     mutationFn: async (storyData: { genre: string; voice: string; title: string }) => {

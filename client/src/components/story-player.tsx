@@ -26,8 +26,7 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
 
   const queryClient = useQueryClient();
 
-  // Debug log to see what chapter data we're receiving
-  console.log('StoryPlayer currentChapter:', currentChapter);
+
 
   const generateChapterMutation = useMutation({
     mutationFn: async ({ storyId, previousChoice }: { storyId: number; previousChoice?: string }) => {

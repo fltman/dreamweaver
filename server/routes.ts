@@ -38,7 +38,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all stories
   app.get("/api/stories", async (req, res) => {
     try {
-      const stories = Array.from((storage as any).stories.values());
+      const stories = await storage.getAllStories();
       console.log(`[Stories API] Returning ${stories.length} stories`);
       res.json(stories);
     } catch (error) {
