@@ -35,6 +35,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all stories
+  app.get("/api/stories", async (req, res) => {
+    try {
+      const stories = Array.from((storage as any).stories.values());
+      console.log(`[Stories API] Returning ${stories.length} stories`);
+      res.json(stories);
+    } catch (error) {
+      console.error("Failed to get stories:", error);
+      res.status(500).json({ message: "Failed to get stories" });
+    }
+  });
+
   // Get story by ID
   app.get("/api/stories/:id", async (req, res) => {
     try {
