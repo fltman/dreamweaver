@@ -36,7 +36,7 @@ export default function AudioPlayer({ audioUrl, onPlaybackComplete, autoPlay = f
     const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
-      // Don't call onPlaybackComplete to prevent auto-continuation
+      onPlaybackComplete?.();
     };
 
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);

@@ -136,12 +136,11 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
                 <span className="ml-3 text-muted-foreground">Crafting your story...</span>
               </div>
             ) : currentChapter && currentChapter.content ? (
-              <div className="story-content text-foreground/90 leading-relaxed">
-                {currentChapter.content.split('\n').map((paragraph, index) => (
-                  <p key={index} className="mb-6 last:mb-0">
-                    {paragraph}
-                  </p>
-                ))}
+              <div className="text-center py-12 text-muted-foreground">
+                <div className="w-16 h-16 mx-auto mb-4 bg-primary/20 rounded-full flex items-center justify-center">
+                  <div className="w-8 h-8 bg-primary/40 rounded-full animate-pulse"></div>
+                </div>
+                <p>Listening to your dream...</p>
               </div>
             ) : (
               <div className="text-center py-12 text-muted-foreground">

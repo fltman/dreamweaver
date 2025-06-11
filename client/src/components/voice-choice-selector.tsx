@@ -6,11 +6,13 @@ import { Mic, MicOff } from "lucide-react";
 interface VoiceChoiceSelectorProps {
   choices: StoryChoice[];
   onChoiceSelect: (choiceId: string) => void;
+  autoStartListening?: boolean;
 }
 
 export default function VoiceChoiceSelector({ 
   choices, 
-  onChoiceSelect
+  onChoiceSelect,
+  autoStartListening = true
 }: VoiceChoiceSelectorProps) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -61,6 +63,15 @@ export default function VoiceChoiceSelector({
       setRecognition(recognitionInstance);
     }
   }, []);
+
+  // Auto-start listening when component mounts
+  useEffect(() => {
+    if (autoStartListening && recognition && !isListening) {
+      setTimeout(() => {
+        startListening();
+      }, 1000); // Small delay to ensure component is ready
+    }
+  }, [recognition, autoStartListening]);
 
   const checkForChoiceMatch = (spokenText: string) => {
     const normalizedText = spokenText.replace(/[^\w\s]/g, '').toLowerCase();
