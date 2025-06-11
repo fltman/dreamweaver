@@ -40,6 +40,25 @@ export default function BackgroundMusic({ onVolumeChange }: BackgroundMusicProps
 
   // Background music plays independently - no interaction with story audio
 
+  // Reload audio when track changes
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      console.log('[BackgroundMusic] Loading track', currentTrack + 1, ':', MUSIC_FILES[currentTrack]);
+      audio.src = `/music/${MUSIC_FILES[currentTrack]}`;
+      audio.load();
+      
+      // If music was playing, continue playing the new track
+      if (isUserPlaying) {
+        setTimeout(() => {
+          audio.play().catch(error => {
+            console.error('[BackgroundMusic] Failed to play new track:', error);
+          });
+        }, 100);
+      }
+    }
+  }, [currentTrack, isUserPlaying]);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (audio) {
@@ -51,16 +70,7 @@ export default function BackgroundMusic({ onVolumeChange }: BackgroundMusicProps
         console.log('[BackgroundMusic] Track ended, advancing to next track');
         handleTrackEnd();
         
-        // Continue playing if music was playing
-        if (isUserPlaying) {
-          setTimeout(() => {
-            audio.play().then(() => {
-              console.log('[BackgroundMusic] Next track started playing');
-            }).catch(error => {
-              console.error('[BackgroundMusic] Failed to play next track:', error);
-            });
-          }, 500); // Small delay to allow track change
-        }
+        // Track will auto-advance and play via useEffect
       };
       
       audio.addEventListener('ended', handleTrackEndEvent);
@@ -73,8 +83,9 @@ export default function BackgroundMusic({ onVolumeChange }: BackgroundMusicProps
 
   const handleTrackEnd = () => {
     // Move to next track, loop back to start when reaching end
-    const nextTrack = (currentTrack + 1) % MUSIC_FILES.length;
-    setCurrentTrack(nextTrack);
+    const nextTrackIndex = (currentTrack + 1) % MUSIC_FILES.length;
+    console.log('[BackgroundMusic] Advancing from track', currentTrack + 1, 'to track', nextTrackIndex + 1);
+    setCurrentTrack(nextTrackIndex);
   };
 
   const handleVolumeChange = (value: number[]) => {
@@ -117,9 +128,7 @@ export default function BackgroundMusic({ onVolumeChange }: BackgroundMusicProps
         preload="auto"
         onLoadedData={() => console.log('[BackgroundMusic] Audio loaded')}
         onError={(e) => console.error('[BackgroundMusic] Audio error:', e)}
-      >
-        <source src={`/music/${MUSIC_FILES[currentTrack]}`} type="audio/mpeg" />
-      </audio>
+      />
       
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">Background Music</span>
