@@ -14,11 +14,12 @@ export default function Home() {
   const [selectedVoice, setSelectedVoice] = useState<string>();
   const [currentStory, setCurrentStory] = useState<Story>();
 
-  const { data: currentChapter } = useQuery<Chapter>({
+  const { data: chapters } = useQuery<Chapter[]>({
     queryKey: ['/api/stories', currentStory?.id.toString(), 'chapters'],
-    enabled: !!currentStory,
-    select: (chapters: Chapter[]) => chapters[chapters.length - 1] // Get latest chapter
+    enabled: !!currentStory
   });
+
+  const currentChapter = chapters?.[chapters.length - 1];
 
   const createStoryMutation = useMutation({
     mutationFn: async (storyData: { genre: string; voice: string; title: string }) => {
