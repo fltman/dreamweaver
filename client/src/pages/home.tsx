@@ -47,12 +47,22 @@ export default function Home() {
       console.log('[CreateStory] API response:', story);
       return story;
     },
-    onSuccess: (story: Story) => {
+    onSuccess: async (story: Story) => {
       console.log('[CreateStory] onSuccess called with story:', story);
       setCurrentStory(story);
       setCurrentScreen('player');
-      // Clear all cache to prevent data collision
-      queryClient.clear();
+      
+      // Immediately trigger chapter generation
+      console.log('[CreateStory] Triggering first chapter generation...');
+      try {
+        const chapterResponse = await apiRequest('POST', `/api/stories/${story.id}/chapters`, {});
+        console.log('[CreateStory] First chapter generated:', chapterResponse);
+        
+        // Invalidate chapters query to fetch the new chapter
+        queryClient.invalidateQueries({ queryKey: [`/api/stories/${story.id}/chapters`] });
+      } catch (error) {
+        console.error('[CreateStory] Failed to generate first chapter:', error);
+      }
     }
   });
 

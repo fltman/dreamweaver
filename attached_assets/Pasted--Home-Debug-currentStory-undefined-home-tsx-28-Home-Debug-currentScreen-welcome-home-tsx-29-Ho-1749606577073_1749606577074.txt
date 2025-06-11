@@ -1,0 +1,55 @@
+[Home Debug] currentStory: undefined
+home.tsx:28 [Home Debug] currentScreen: welcome
+home.tsx:29 [Home Debug] chaptersLoading: false
+home.tsx:30 [Home Debug] chaptersError: null
+home.tsx:31 [Home Debug] chapters array: undefined
+home.tsx:32 [Home Debug] currentChapter: undefined
+home.tsx:33 [Home Debug] chapters length: 0
+home.tsx:27 [Home Debug] currentStory: undefined
+home.tsx:28 [Home Debug] currentScreen: welcome
+home.tsx:29 [Home Debug] chaptersLoading: false
+home.tsx:30 [Home Debug] chaptersError: null
+home.tsx:31 [Home Debug] chapters array: undefined
+home.tsx:32 [Home Debug] currentChapter: undefined
+home.tsx:33 [Home Debug] chapters length: 0
+home.tsx:142 [StartButton] Clicked with genre: peaceful voice: luna
+home.tsx:44 [CreateStory] Making API request with: {genre: 'peaceful', voice: 'luna', title: 'Gentle Streams'}
+home.tsx:27 [Home Debug] currentStory: undefined
+home.tsx:28 [Home Debug] currentScreen: welcome
+home.tsx:29 [Home Debug] chaptersLoading: false
+home.tsx:30 [Home Debug] chaptersError: null
+home.tsx:31 [Home Debug] chapters array: undefined
+home.tsx:32 [Home Debug] currentChapter: undefined
+home.tsx:33 [Home Debug] chapters length: 0
+home.tsx:47 [CreateStory] API response: {genre: 'peaceful', voice: 'luna', title: 'Gentle Streams', id: 1, createdAt: '2025-06-11T01:48:36.315Z', …}
+home.tsx:51 [CreateStory] onSuccess called with story: {genre: 'peaceful', voice: 'luna', title: 'Gentle Streams', id: 1, createdAt: '2025-06-11T01:48:36.315Z', …}
+home.tsx:27 [Home Debug] currentStory: {genre: 'peaceful', voice: 'luna', title: 'Gentle Streams', id: 1, createdAt: '2025-06-11T01:48:36.315Z', …}
+home.tsx:28 [Home Debug] currentScreen: player
+home.tsx:29 [Home Debug] chaptersLoading: true
+home.tsx:30 [Home Debug] chaptersError: null
+home.tsx:31 [Home Debug] chapters array: undefined
+home.tsx:32 [Home Debug] currentChapter: undefined
+home.tsx:33 [Home Debug] chapters length: 0
+story-player.tsx:30 [StoryPlayer Debug] story: {genre: 'peaceful', voice: 'luna', title: 'Gentle Streams', id: 1, createdAt: '2025-06-11T01:48:36.315Z', …}
+story-player.tsx:31 [StoryPlayer Debug] currentChapter prop: undefined
+story-player.tsx:32 [StoryPlayer Debug] currentChapter exists? false
+story-player.tsx:33 [StoryPlayer Debug] currentChapter.content exists? false
+story-player.tsx:30 [StoryPlayer Debug] story: {genre: 'peaceful', voice: 'luna', title: 'Gentle Streams', id: 1, createdAt: '2025-06-11T01:48:36.315Z', …}
+story-player.tsx:31 [StoryPlayer Debug] currentChapter prop: undefined
+story-player.tsx:32 [StoryPlayer Debug] currentChapter exists? false
+story-player.tsx:33 [StoryPlayer Debug] currentChapter.content exists? false
+home.tsx:27 [Home Debug] currentStory: {genre: 'peaceful', voice: 'luna', title: 'Gentle Streams', id: 1, createdAt: '2025-06-11T01:48:36.315Z', …}
+home.tsx:28 [Home Debug] currentScreen: player
+home.tsx:29 [Home Debug] chaptersLoading: false
+home.tsx:30 [Home Debug] chaptersError: null
+home.tsx:31 [Home Debug] chapters array: []
+home.tsx:32 [Home Debug] currentChapter: undefined
+home.tsx:33 [Home Debug] chapters length: 0
+story-player.tsx:30 [StoryPlayer Debug] story: {genre: 'peaceful', voice: 'luna', title: 'Gentle Streams', id: 1, createdAt: '2025-06-11T01:48:36.315Z', …}
+story-player.tsx:31 [StoryPlayer Debug] currentChapter prop: undefined
+story-player.tsx:32 [StoryPlayer Debug] currentChapter exists? false
+story-player.tsx:33 [StoryPlayer Debug] currentChapter.content exists? false
+story-player.tsx:30 [StoryPlayer Debug] story: {genre: 'peaceful', voice: 'luna', title: 'Gentle Streams', id: 1, createdAt: '2025-06-11T01:48:36.315Z', …}
+story-player.tsx:31 [StoryPlayer Debug] currentChapter prop: undefined
+story-player.tsx:32 [StoryPlayer Debug] currentChapter exists? false
+story-player.tsx:33 [StoryPlayer Debug] currentChapter.content exists? false
