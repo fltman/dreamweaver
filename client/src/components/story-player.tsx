@@ -56,8 +56,8 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
   });
 
   useEffect(() => {
-    if (!currentChapter) {
-      // Generate first chapter
+    if (!currentChapter && !generateChapterMutation.isPending) {
+      // Generate first chapter only if not already generating
       generateChapterMutation.mutate({ storyId: story.id });
     }
   }, [story.id]); // Remove currentChapter from dependencies to prevent re-triggering
@@ -74,15 +74,23 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
   const handleChoiceSelect = (choiceId: string) => {
     if (!currentChapter) return;
     
+    // Handle sleep signal - user appears to be asleep
+    if (choiceId === '__SLEEP__') {
+      console.log('User appears to be asleep - stopping story');
+      setShowChoices(false);
+      onBack(); // Return to home screen when user falls asleep
+      return;
+    }
+    
     const choice = currentChapter.choices.find(c => c.id === choiceId);
-    if (choice) {
+    if (choice && !generateChapterMutation.isPending) {
       // Update current chapter with user choice
       updateChapterMutation.mutate({
         chapterId: currentChapter.id,
         userChoice: choice.text
       });
 
-      // Generate next chapter
+      // Generate next chapter only if not already generating
       generateChapterMutation.mutate({
         storyId: story.id,
         previousChoice: choice.text
