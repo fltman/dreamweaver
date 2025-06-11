@@ -16,12 +16,20 @@ export default function AudioPlayer({ audioUrl, onPlaybackComplete, autoPlay = f
   const [volume, setVolume] = useState(75);
   const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const lastAudioUrlRef = useRef<string | undefined>();
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !audioUrl) return;
 
+    // Skip if same audio URL to prevent unnecessary reloads
+    if (lastAudioUrlRef.current === audioUrl) {
+      console.log('[AudioPlayer] Skipping reload - same audio URL');
+      return;
+    }
+
     console.log('[AudioPlayer] Setting up audio with URL:', audioUrl?.substring(0, 50) + '...');
+    lastAudioUrlRef.current = audioUrl;
 
     const handleLoadedMetadata = () => {
       console.log('[AudioPlayer] Audio loaded, duration:', audio.duration);

@@ -60,7 +60,7 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
       // Generate first chapter
       generateChapterMutation.mutate({ storyId: story.id });
     }
-  }, [story.id, currentChapter]);
+  }, [story.id]); // Remove currentChapter from dependencies to prevent re-triggering
 
   const handlePlaybackComplete = () => {
     if (currentChapter?.choices && currentChapter.choices.length > 0) {
