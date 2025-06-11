@@ -84,7 +84,7 @@ export default function BackgroundMusic({ onVolumeChange, storyAudioPlaying = fa
         audio.removeEventListener('ended', handleTrackEndEvent);
       };
     }
-  }, [volume, isMuted, onVolumeChange, isBackgroundPlaying, isPlaying, storyAudioPlaying, currentTrack]);
+  }, [volume, isMuted, onVolumeChange, isUserPlaying, storyAudioPlaying, currentTrack]);
 
   const handleTrackEnd = () => {
     // Move to next track, loop back to start when reaching end
@@ -142,10 +142,10 @@ export default function BackgroundMusic({ onVolumeChange, storyAudioPlaying = fa
           <Button
             size="sm"
             variant="ghost"
-            onClick={toggleBackgroundMusic}
+            onClick={togglePlayPause}
             className="h-8 w-8 p-0"
           >
-            {isBackgroundPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {isUserPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </Button>
           <Button
             size="sm"

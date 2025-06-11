@@ -184,7 +184,6 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
 
       {/* Background Music */}
       <BackgroundMusic 
-        isPlaying={!!currentChapter?.audioUrl}
         storyAudioPlaying={isStoryAudioPlaying}
       />
 

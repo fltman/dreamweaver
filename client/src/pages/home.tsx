@@ -7,6 +7,7 @@ import StoryPlayer from "@/components/story-player";
 import { Story, Chapter } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import BackgroundMusic from "@/components/background-music";
 
 export default function Home() {
   const [currentScreen, setCurrentScreen] = useState<'welcome' | 'player'>('welcome');
@@ -270,6 +271,9 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Background Music - Always Available */}
+      <BackgroundMusic />
     </div>
   );
 }
