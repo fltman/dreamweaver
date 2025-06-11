@@ -18,6 +18,7 @@ interface StoryPlayerProps {
 export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlayerProps) {
   const [showChoices, setShowChoices] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isStoryAudioPlaying, setIsStoryAudioPlaying] = useState(false);
   const [settings, setSettings] = useState({
     speechSpeed: 1.0,
     voiceTone: 'normal',
@@ -166,6 +167,7 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
             <AudioPlayer
               audioUrl={currentChapter.audioUrl}
               onPlaybackComplete={handlePlaybackComplete}
+              onPlayingChange={setIsStoryAudioPlaying}
               autoPlay={true}
             />
           )}
@@ -183,6 +185,7 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
       {/* Background Music */}
       <BackgroundMusic 
         isPlaying={!!currentChapter?.audioUrl}
+        storyAudioPlaying={isStoryAudioPlaying}
       />
 
       {/* Settings Modal */}

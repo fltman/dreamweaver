@@ -7,9 +7,10 @@ interface AudioPlayerProps {
   audioUrl?: string;
   onPlaybackComplete?: () => void;
   autoPlay?: boolean;
+  onPlayingChange?: (isPlaying: boolean) => void;
 }
 
-export default function AudioPlayer({ audioUrl, onPlaybackComplete, autoPlay = false }: AudioPlayerProps) {
+export default function AudioPlayer({ audioUrl, onPlaybackComplete, autoPlay = false, onPlayingChange }: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -58,11 +59,13 @@ export default function AudioPlayer({ audioUrl, onPlaybackComplete, autoPlay = f
     const handlePlay = () => {
       console.log('[AudioPlayer] Audio started playing');
       setIsPlaying(true);
+      onPlayingChange?.(true);
     };
 
     const handlePause = () => {
       console.log('[AudioPlayer] Audio paused');
       setIsPlaying(false);
+      onPlayingChange?.(false);
     };
 
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);

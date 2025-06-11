@@ -28,7 +28,7 @@ const MUSIC_FILES = [
   "Untitled (15).mp3"
 ];
 
-export default function BackgroundMusic({ isPlaying, onVolumeChange }: BackgroundMusicProps) {
+export default function BackgroundMusic({ isPlaying, onVolumeChange, storyAudioPlaying = false }: BackgroundMusicProps) {
   const [volume, setVolume] = useState(30); // Lower default volume for background music
   const [isMuted, setIsMuted] = useState(false);
   const [currentTrack, setCurrentTrack] = useState(0);
@@ -43,12 +43,12 @@ export default function BackgroundMusic({ isPlaying, onVolumeChange }: Backgroun
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (isPlaying) {
+    if (isPlaying && !storyAudioPlaying) {
       audio.play().catch(console.error);
     } else {
       audio.pause();
     }
-  }, [isPlaying]);
+  }, [isPlaying, storyAudioPlaying]);
 
   useEffect(() => {
     const audio = audioRef.current;
