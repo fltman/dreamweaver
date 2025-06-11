@@ -1,5 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import express from "express";
+import path from "path";
+import fs from "fs";
 import { storage } from "./storage";
 import { generateStoryChapter } from "./services/openai";
 import { convertTextToSpeech, getAvailableVoices } from "./services/elevenlabs";
@@ -7,6 +10,12 @@ import { insertStorySchema, insertChapterSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // Serve music files from client/music directory
+  const musicPath = path.resolve(import.meta.dirname, "../client/music");
+  if (fs.existsSync(musicPath)) {
+    app.use("/music", express.static(musicPath));
+  }
   
   // Get available voices
   app.get("/api/voices", async (req, res) => {

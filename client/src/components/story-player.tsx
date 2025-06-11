@@ -5,6 +5,7 @@ import { Story, Chapter, AppState } from "@/lib/types";
 import AudioPlayer from "./audio-player";
 import VoiceChoiceSelector from "./voice-choice-selector";
 import SettingsModal from "./settings-modal";
+import BackgroundMusic from "./background-music";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -178,6 +179,11 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
           />
         )}
       </div>
+
+      {/* Background Music */}
+      <BackgroundMusic 
+        isPlaying={!!currentChapter?.audioUrl}
+      />
 
       {/* Settings Modal */}
       <SettingsModal
