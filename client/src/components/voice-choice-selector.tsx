@@ -22,6 +22,7 @@ export default function VoiceChoiceSelector({
   const [silenceTimeoutId, setSilenceTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [attemptCount, setAttemptCount] = useState(0);
   const streamRef = useRef<MediaStream | null>(null);
 
   const analyzeAudioForSpeech = async (audioBlob: Blob): Promise<boolean> => {
@@ -114,11 +115,30 @@ export default function VoiceChoiceSelector({
             analyzeAudioForSpeech(audioBlob).then((hasSpeech: boolean) => {
               if (hasSpeech) {
                 console.log('[VoiceChoice] Speech detected, transcribing...');
+                setAttemptCount(0); // Reset attempt count on speech detection
                 transcribeAudio(audioBlob);
               } else {
-                console.log('[VoiceChoice] No speech detected, skipping transcription');
+                console.log('[VoiceChoice] No speech detected, incrementing attempt count');
+                const newAttemptCount = attemptCount + 1;
+                setAttemptCount(newAttemptCount);
+                
+                // Only trigger sleep detection after 4 consecutive failed attempts
+                if (newAttemptCount >= 4) {
+                  console.log('[VoiceChoice] Multiple failed attempts, user may be asleep');
+                  onChoiceSelect('__SLEEP__');
+                  return;
+                }
+                
+                // Continue listening for more attempts
                 setIsListening(false);
                 setIsRecording(false);
+                
+                // Auto-restart listening after a brief pause
+                setTimeout(() => {
+                  if (!selectedChoice) {
+                    startListening();
+                  }
+                }, 3000);
               }
             });
             
@@ -173,7 +193,25 @@ export default function VoiceChoiceSelector({
       setTranscript(transcribedText);
       
       if (transcribedText.trim()) {
+        setAttemptCount(0); // Reset attempt count on successful transcription
         checkForChoiceMatch(transcribedText.toLowerCase().trim());
+      } else {
+        // No transcription result, increment attempt count
+        const newAttemptCount = attemptCount + 1;
+        setAttemptCount(newAttemptCount);
+        
+        if (newAttemptCount >= 4) {
+          console.log('[VoiceChoice] Multiple failed attempts, user may be asleep');
+          onChoiceSelect('__SLEEP__');
+          return;
+        }
+        
+        // Auto-restart listening after a brief pause
+        setTimeout(() => {
+          if (!selectedChoice) {
+            startListening();
+          }
+        }, 3000);
       }
     } catch (error) {
       console.error('[VoiceChoice] Transcription error:', error);
@@ -214,11 +252,30 @@ export default function VoiceChoiceSelector({
           setSilenceTimeoutId(null);
         }
         
+        setAttemptCount(0); // Reset attempt count on successful match
         setSelectedChoice(choice.id);
         setTimeout(() => onChoiceSelect(choice.id), 1000); // Small delay to show selection
         return;
       }
     }
+    
+    // No choice matched - increment attempt count and continue listening
+    console.log('[VoiceChoice] No choice matched for:', spokenText);
+    const newAttemptCount = attemptCount + 1;
+    setAttemptCount(newAttemptCount);
+    
+    if (newAttemptCount >= 4) {
+      console.log('[VoiceChoice] Multiple failed attempts, user may be asleep');
+      onChoiceSelect('__SLEEP__');
+      return;
+    }
+    
+    // Auto-restart listening after a brief pause
+    setTimeout(() => {
+      if (!selectedChoice) {
+        startListening();
+      }
+    }, 3000);
   };
 
   const startListening = () => {
@@ -232,19 +289,6 @@ export default function VoiceChoiceSelector({
     try {
       console.log('[VoiceChoice] Starting audio recording');
       mediaRecorder.start(1000); // Collect data every 1 second
-      
-      // Set a 60-second timeout for sleep detection
-      if (sleepTimeoutId) {
-        clearTimeout(sleepTimeoutId);
-      }
-      
-      const newSleepTimeout = setTimeout(() => {
-        console.log('User seems to be asleep, stopping voice recording');
-        stopListening();
-        onChoiceSelect('__SLEEP__'); // Special signal to indicate sleep
-      }, 60000); // 60 seconds
-      
-      setSleepTimeoutId(newSleepTimeout);
       
       // Auto-stop recording after 5 seconds to get a voice sample
       setTimeout(() => {
@@ -333,6 +377,11 @@ export default function VoiceChoiceSelector({
                 {isRecording ? "Recording your voice..." : "Processing..."}
               </span>
             </div>
+            {attemptCount > 0 && (
+              <div className="text-xs text-yellow-500">
+                Sleep detection: {attemptCount}/4 attempts
+              </div>
+            )}
             {transcript && (
               <p className="text-sm italic bg-muted/50 p-2 rounded">
                 "{transcript}"
