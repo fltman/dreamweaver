@@ -64,7 +64,10 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
 
   const handlePlaybackComplete = () => {
     if (currentChapter?.choices && currentChapter.choices.length > 0) {
-      setShowChoices(true);
+      // Delay showing choices to ensure audio has completely stopped
+      setTimeout(() => {
+        setShowChoices(true);
+      }, 2000);
     }
   };
 

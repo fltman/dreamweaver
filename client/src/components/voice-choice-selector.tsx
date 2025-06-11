@@ -64,12 +64,12 @@ export default function VoiceChoiceSelector({
     }
   }, []);
 
-  // Auto-start listening when component mounts
+  // Auto-start listening when component mounts with longer delay
   useEffect(() => {
     if (autoStartListening && recognition && !isListening) {
       setTimeout(() => {
         startListening();
-      }, 1000); // Small delay to ensure component is ready
+      }, 3000); // Longer delay to ensure audio has finished completely
     }
   }, [recognition, autoStartListening]);
 
