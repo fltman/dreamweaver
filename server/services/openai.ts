@@ -1,7 +1,8 @@
 import OpenAI from "openai";
 
 const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || "default_key"
+  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || "default_key",
+  timeout: 60000 // 60 second timeout
 });
 
 export interface StoryChapter {
@@ -24,7 +25,7 @@ export async function generateStoryChapter(
 Guidelines:
 - Write in a gentle, calming tone perfect for bedtime
 - Create vivid but peaceful imagery
-- Use approximately 5000 characters for the chapter content
+- Use approximately 2000-2500 characters for the chapter content
 - Always end with exactly 2 meaningful choices that advance the story
 - Make choices feel consequential but not stressful
 - Focus on wonder, exploration, and gentle adventure

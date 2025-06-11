@@ -28,9 +28,13 @@ export async function convertTextToSpeech(
   const voice = VOICE_MAP[voiceId] || VOICE_MAP.sarah;
   console.log(`[ElevenLabs] Converting text to speech - Voice: ${voiceId} (${voice}), Text length: ${text.length}`);
   
+  // For very long texts (>2000 chars), use turbo model which is faster
+  const modelId = text.length > 2000 ? "eleven_turbo_v2_5" : "eleven_multilingual_v2";
+  console.log(`[ElevenLabs] Using model: ${modelId}`);
+  
   const requestBody = {
     text: text,
-    model_id: "eleven_multilingual_v2",
+    model_id: modelId,
     voice_settings: {
       stability: options.stability || 0.75,
       similarity_boost: options.similarity_boost || 0.75,
@@ -42,9 +46,10 @@ export async function convertTextToSpeech(
   try {
     console.log(`[ElevenLabs] Making API request to: https://api.elevenlabs.io/v1/text-to-speech/${voice}`);
     
-    // Create AbortController for timeout
+    // Create AbortController for timeout - increased for long texts
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+    const timeoutMs = text.length > 2000 ? 120000 : 60000; // 2 minutes for long texts
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
       method: 'POST',
@@ -73,13 +78,14 @@ export async function convertTextToSpeech(
     console.log(`[ElevenLabs] Audio generated successfully, buffer size: ${buffer.length} bytes`);
     
     return buffer;
-  } catch (error) {
+  } catch (error: any) {
     if (error.name === 'AbortError') {
-      console.error("[ElevenLabs] Request timed out after 60 seconds");
+      const timeoutSecs = text.length > 2000 ? 120 : 60;
+      console.error(`[ElevenLabs] Request timed out after ${timeoutSecs} seconds`);
       throw new Error("Text-to-speech request timed out. Please try again.");
     }
     console.error("[ElevenLabs] API error:", error);
-    throw new Error("Failed to convert text to speech: " + (error as Error).message);
+    throw new Error("Failed to convert text to speech: " + (error.message || error));
   }
 }
 
