@@ -217,7 +217,7 @@ export default function VoiceChoiceSelector({
             {isListening ? (
               <>
                 <MicOff className="w-5 h-5 mr-2" />
-                Stop Listening
+                {isRecording ? "Stop Recording" : "Stop Listening"}
               </>
             ) : (
               <>
@@ -232,7 +232,9 @@ export default function VoiceChoiceSelector({
           <div className="space-y-2">
             <div className="flex items-center justify-center space-x-2">
               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              <span className="text-sm text-muted-foreground">Listening...</span>
+              <span className="text-sm text-muted-foreground">
+                {isRecording ? "Recording your voice..." : "Processing..."}
+              </span>
             </div>
             {transcript && (
               <p className="text-sm italic bg-muted/50 p-2 rounded">
