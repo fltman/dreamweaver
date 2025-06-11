@@ -15,30 +15,28 @@ export default function Home() {
   const [currentStory, setCurrentStory] = useState<Story>();
   const queryClient = useQueryClient();
 
-  const { data: chapters, isLoading: chaptersLoading, error: chaptersError, isSuccess: chaptersSuccess } = useQuery<Chapter[]>({
+  const { data: chapters, isLoading: chaptersLoading, error: chaptersError } = useQuery({
     queryKey: [`/api/stories/${currentStory?.id}/chapters`],
     enabled: !!currentStory,
-    staleTime: 0,
-    cacheTime: 0
+    staleTime: 0
   });
 
-  const currentChapter = chapters?.[chapters.length - 1];
+  const currentChapter = chapters && Array.isArray(chapters) ? chapters[chapters.length - 1] : undefined;
 
   // Comprehensive logging
   console.log('[Home Debug] currentStory:', currentStory);
   console.log('[Home Debug] currentScreen:', currentScreen);
   console.log('[Home Debug] chaptersLoading:', chaptersLoading);
   console.log('[Home Debug] chaptersError:', chaptersError);
-  console.log('[Home Debug] chaptersSuccess:', chaptersSuccess);
   console.log('[Home Debug] chapters array:', chapters);
   console.log('[Home Debug] currentChapter:', currentChapter);
-  console.log('[Home Debug] chapters length:', chapters?.length || 0);
+  console.log('[Home Debug] chapters length:', Array.isArray(chapters) ? chapters.length : 0);
   
   // Deep dive into chapter structure
-  if (chapters && chapters.length > 0) {
+  if (chapters && Array.isArray(chapters) && chapters.length > 0) {
     console.log('[Home Debug] First chapter structure:', JSON.stringify(chapters[0], null, 2));
-    console.log('[Home Debug] Chapter content property:', chapters[0].content);
-    console.log('[Home Debug] Chapter keys:', Object.keys(chapters[0]));
+    console.log('[Home Debug] Chapter content property:', chapters[0]?.content);
+    console.log('[Home Debug] Chapter keys:', Object.keys(chapters[0] || {}));
   }
 
   const createStoryMutation = useMutation({
