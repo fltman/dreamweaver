@@ -3,13 +3,35 @@ import { createServer, type Server } from "http";
 import express from "express";
 import path from "path";
 import fs from "fs";
+import multer from "multer";
 import { storage } from "./storage";
 import { generateStoryChapter } from "./services/openai";
 import { convertTextToSpeech, getAvailableVoices } from "./services/elevenlabs";
 import { insertStorySchema, insertChapterSchema } from "@shared/schema";
 import { z } from "zod";
+import OpenAI from "openai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // Initialize OpenAI client
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  // Configure multer for audio file uploads
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 25 * 1024 * 1024, // 25MB limit for audio files
+    },
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('audio/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only audio files are allowed'));
+      }
+    },
+  });
   
   // Serve music files from client/music directory
   const musicPath = path.resolve(import.meta.dirname, "../client/music");
@@ -17,6 +39,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.use("/music", express.static(musicPath));
   }
   
+  // Transcribe audio using OpenAI Whisper
+  app.post("/api/transcribe", upload.single('audio'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No audio file provided" });
+      }
+
+      console.log('[Transcription] Received audio file:', {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+      });
+
+      // Create a temporary file for OpenAI Whisper API
+      const tempFilePath = path.join(import.meta.dirname, `temp_audio_${Date.now()}.webm`);
+      fs.writeFileSync(tempFilePath, req.file.buffer);
+
+      try {
+        // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+        const transcription = await openai.audio.transcriptions.create({
+          file: fs.createReadStream(tempFilePath),
+          model: "whisper-1",
+          language: "en",
+        });
+
+        console.log('[Transcription] OpenAI Whisper result:', transcription.text);
+
+        // Clean up temporary file
+        fs.unlinkSync(tempFilePath);
+
+        res.json({ 
+          text: transcription.text,
+          success: true 
+        });
+
+      } catch (whisperError) {
+        // Clean up temporary file on error
+        if (fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+        }
+        throw whisperError;
+      }
+
+    } catch (error) {
+      console.error('[Transcription] Error:', error);
+      res.status(500).json({ 
+        message: "Failed to transcribe audio",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Get available voices
   app.get("/api/voices", async (req, res) => {
     try {

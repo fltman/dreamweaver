@@ -22,7 +22,6 @@ export default function VoiceChoiceSelector({
   const [silenceTimeoutId, setSilenceTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
@@ -36,18 +35,20 @@ export default function VoiceChoiceSelector({
           mimeType: 'audio/webm;codecs=opus'
         });
         
+        let recordingChunks: Blob[] = [];
+        
         recorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
-            setAudioChunks(prev => [...prev, event.data]);
+            recordingChunks.push(event.data);
           }
         };
         
         recorder.onstop = () => {
           // Process audio chunks when recording stops
-          if (audioChunks.length > 0) {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
+          if (recordingChunks.length > 0) {
+            const audioBlob = new Blob(recordingChunks, { type: 'audio/webm;codecs=opus' });
             transcribeAudio(audioBlob);
-            setAudioChunks([]);
+            recordingChunks = [];
           }
         };
         
@@ -140,7 +141,6 @@ export default function VoiceChoiceSelector({
     setIsRecording(true);
     setTranscript("");
     setSelectedChoice(null);
-    setAudioChunks([]); // Reset audio chunks
     
     try {
       console.log('[VoiceChoice] Starting audio recording');
@@ -202,7 +202,7 @@ export default function VoiceChoiceSelector({
     <div className="space-y-6 pt-6 animate-fade-in">
       <div className="text-center space-y-4">
         <h3 className="text-2xl font-light">What happens next?</h3>
-        <p className="text-muted-foreground">Speak your choice or tap to select</p>
+        <p className="text-muted-foreground">Speak your choice (using AI transcription) or tap to select</p>
       </div>
       
       {/* Voice Control Section */}
