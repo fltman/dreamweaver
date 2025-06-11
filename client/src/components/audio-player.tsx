@@ -21,9 +21,13 @@ export default function AudioPlayer({ audioUrl, onPlaybackComplete, autoPlay = f
     const audio = audioRef.current;
     if (!audio || !audioUrl) return;
 
+    console.log('[AudioPlayer] Setting up audio with URL:', audioUrl?.substring(0, 50) + '...');
+
     const handleLoadedMetadata = () => {
+      console.log('[AudioPlayer] Audio loaded, duration:', audio.duration);
       setDuration(audio.duration);
       if (autoPlay) {
+        console.log('[AudioPlayer] Auto-playing audio');
         audio.play();
         setIsPlaying(true);
       }
@@ -34,22 +38,44 @@ export default function AudioPlayer({ audioUrl, onPlaybackComplete, autoPlay = f
     };
 
     const handleEnded = () => {
+      console.log('[AudioPlayer] Audio ended naturally');
       setIsPlaying(false);
       setCurrentTime(0);
+      // Ensure audio doesn't restart
+      audio.pause();
+      audio.currentTime = 0;
       onPlaybackComplete?.();
+    };
+
+    const handlePlay = () => {
+      console.log('[AudioPlayer] Audio started playing');
+      setIsPlaying(true);
+    };
+
+    const handlePause = () => {
+      console.log('[AudioPlayer] Audio paused');
+      setIsPlaying(false);
     };
 
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
 
+    // Ensure no loop attribute
+    audio.loop = false;
+    
     // Load the audio
     audio.load();
 
     return () => {
+      console.log('[AudioPlayer] Cleaning up audio listeners');
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
     };
   }, [audioUrl, autoPlay, onPlaybackComplete]);
 
@@ -100,7 +126,16 @@ export default function AudioPlayer({ audioUrl, onPlaybackComplete, autoPlay = f
 
   return (
     <div className="audio-controls bg-card/50 rounded-2xl p-6 border border-border space-y-4">
-      <audio ref={audioRef} preload="metadata">
+      <audio 
+        ref={audioRef} 
+        preload="metadata"
+        loop={false}
+        onEnded={() => {
+          setIsPlaying(false);
+          setCurrentTime(0);
+          onPlaybackComplete?.();
+        }}
+      >
         {audioUrl && <source src={audioUrl} type="audio/mpeg" />}
       </audio>
       
