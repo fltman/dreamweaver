@@ -18,6 +18,8 @@ export default function VoiceChoiceSelector({
   const [transcript, setTranscript] = useState("");
   const [recognition, setRecognition] = useState<any>(null);
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
+  const [sleepTimeoutId, setSleepTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [silenceTimeoutId, setSilenceTimeoutId] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Check if browser supports speech recognition
@@ -33,6 +35,12 @@ export default function VoiceChoiceSelector({
         let finalTranscript = '';
         let interimTranscript = '';
         
+        // Clear the sleep timeout - user is speaking
+        if (sleepTimeoutId) {
+          clearTimeout(sleepTimeoutId);
+          setSleepTimeoutId(null);
+        }
+        
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i];
           if (result.isFinal) {
@@ -47,7 +55,18 @@ export default function VoiceChoiceSelector({
         
         // Check if transcript matches any choice
         if (finalTranscript) {
-          checkForChoiceMatch(finalTranscript.toLowerCase().trim());
+          // Clear any existing silence timeout
+          if (silenceTimeoutId) {
+            clearTimeout(silenceTimeoutId);
+            setSilenceTimeoutId(null);  
+          }
+          
+          // Set a silence timeout to detect end of speech (2 seconds)
+          const newSilenceTimeout = setTimeout(() => {
+            console.log('Silence detected, processing speech:', finalTranscript);
+            checkForChoiceMatch(finalTranscript.toLowerCase().trim());
+          }, 2000);
+          setSilenceTimeoutId(newSilenceTimeout);
         }
       };
       
@@ -107,6 +126,14 @@ export default function VoiceChoiceSelector({
       setSelectedChoice(null);
       recognition.start();
       setIsListening(true);
+      
+      // Set 60-second sleep timeout - if no voice detected, assume user is asleep
+      const newSleepTimeout = setTimeout(() => {
+        console.log('No voice detected for 60 seconds - user appears to be asleep');
+        stopListening();
+        onChoiceSelect('__SLEEP__'); // Special signal to indicate sleep
+      }, 60000);
+      setSleepTimeoutId(newSleepTimeout);
     }
   };
 
@@ -114,6 +141,16 @@ export default function VoiceChoiceSelector({
     if (recognition) {
       recognition.stop();
       setIsListening(false);
+    }
+    
+    // Clear timeouts
+    if (sleepTimeoutId) {
+      clearTimeout(sleepTimeoutId);
+      setSleepTimeoutId(null);
+    }
+    if (silenceTimeoutId) {
+      clearTimeout(silenceTimeoutId);
+      setSilenceTimeoutId(null);
     }
   };
 
