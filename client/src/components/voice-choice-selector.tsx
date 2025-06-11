@@ -24,6 +24,68 @@ export default function VoiceChoiceSelector({
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const analyzeAudioForSpeech = async (audioBlob: Blob): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const fileReader = new FileReader();
+      
+      fileReader.onload = async (e) => {
+        try {
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          
+          // Analyze audio for speech characteristics
+          const channelData = audioBuffer.getChannelData(0);
+          const duration = audioBuffer.duration;
+          
+          // Calculate RMS (Root Mean Square) to detect audio level
+          let sum = 0;
+          let peakCount = 0;
+          const threshold = 0.01; // Minimum threshold for speech detection
+          
+          for (let i = 0; i < channelData.length; i++) {
+            const sample = Math.abs(channelData[i]);
+            sum += sample * sample;
+            
+            // Count peaks above threshold
+            if (sample > threshold) {
+              peakCount++;
+            }
+          }
+          
+          const rms = Math.sqrt(sum / channelData.length);
+          const peakRatio = peakCount / channelData.length;
+          
+          console.log('[VoiceChoice] Audio analysis:', {
+            duration: duration.toFixed(2) + 's',
+            rms: rms.toFixed(4),
+            peakRatio: peakRatio.toFixed(4),
+            peakCount
+          });
+          
+          // Consider it speech if:
+          // - RMS is above minimum threshold (has audio content)
+          // - Peak ratio indicates dynamic audio (not just noise)
+          // - Duration is reasonable (not too short)
+          const hasSpeech = rms > 0.005 && peakRatio > 0.02 && duration > 0.5;
+          
+          resolve(hasSpeech);
+        } catch (error) {
+          console.error('[VoiceChoice] Audio analysis error:', error);
+          // If analysis fails, assume there might be speech to be safe
+          resolve(true);
+        }
+      };
+      
+      fileReader.onerror = () => {
+        console.error('[VoiceChoice] FileReader error');
+        resolve(true); // Default to true if we can't analyze
+      };
+      
+      fileReader.readAsArrayBuffer(audioBlob);
+    });
+  };
+
   useEffect(() => {
     // Initialize media recorder for audio recording
     const initializeMediaRecorder = async () => {
@@ -47,7 +109,19 @@ export default function VoiceChoiceSelector({
           // Process audio chunks when recording stops
           if (recordingChunks.length > 0) {
             const audioBlob = new Blob(recordingChunks, { type: 'audio/webm;codecs=opus' });
-            transcribeAudio(audioBlob);
+            
+            // Check if audio contains speech before sending to backend
+            analyzeAudioForSpeech(audioBlob).then((hasSpeech: boolean) => {
+              if (hasSpeech) {
+                console.log('[VoiceChoice] Speech detected, transcribing...');
+                transcribeAudio(audioBlob);
+              } else {
+                console.log('[VoiceChoice] No speech detected, skipping transcription');
+                setIsListening(false);
+                setIsRecording(false);
+              }
+            });
+            
             recordingChunks = [];
           }
         };
@@ -103,6 +177,9 @@ export default function VoiceChoiceSelector({
       }
     } catch (error) {
       console.error('[VoiceChoice] Transcription error:', error);
+    } finally {
+      setIsListening(false);
+      setIsRecording(false);
     }
   };
 
@@ -112,11 +189,11 @@ export default function VoiceChoiceSelector({
     // Check for exact matches or key words in choices
     for (const choice of choices) {
       const choiceText = choice.text.toLowerCase();
-      const choiceWords = choiceText.split(' ');
+      const choiceWords = choiceText.split(' ').filter(word => word.length > 2);
       
-      // Check if spoken text contains key words from choice
+      // Check if any significant words from the choice appear in the spoken text
       const hasKeyWords = choiceWords.some(word => 
-        word.length > 3 && normalizedText.includes(word.toLowerCase())
+        normalizedText.includes(word.toLowerCase())
       );
       
       // Check for number-based selection (e.g., "one", "first", "two", "second")
@@ -252,29 +329,24 @@ export default function VoiceChoiceSelector({
             key={choice.id}
             onClick={() => handleManualChoice(choice.id)}
             variant={selectedChoice === choice.id ? "default" : "outline"}
-            className={`choice-btn p-6 h-auto text-left transition-all duration-300 ${
-              selectedChoice === choice.id ? 'ring-2 ring-primary bg-primary text-primary-foreground' : 'hover:bg-accent'
+            className={`p-6 h-auto text-left justify-start transition-all duration-300 ${
+              selectedChoice === choice.id ? 'ring-2 ring-primary' : ''
             }`}
+            disabled={selectedChoice !== null}
           >
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
-                <span className="text-xs font-medium bg-primary/20 px-2 py-1 rounded">
-                  Option {index + 1}
+                <span className="text-sm font-medium text-muted-foreground">
+                  Choice {index + 1}
                 </span>
               </div>
-              <div className="font-medium">{choice.text}</div>
+              <p className="text-base">{choice.text}</p>
               {choice.description && (
-                <div className="text-sm opacity-80">{choice.description}</div>
+                <p className="text-sm text-muted-foreground">{choice.description}</p>
               )}
             </div>
           </Button>
         ))}
-      </div>
-      
-      <div className="text-center">
-        <p className="text-xs text-muted-foreground">
-          Say "Option one", "Option two", or speak keywords from your choice
-        </p>
       </div>
     </div>
   );
