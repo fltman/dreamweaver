@@ -31,6 +31,13 @@ export default function Home() {
   console.log('[Home Debug] chapters array:', chapters);
   console.log('[Home Debug] currentChapter:', currentChapter);
   console.log('[Home Debug] chapters length:', chapters?.length || 0);
+  
+  // Deep dive into chapter structure
+  if (chapters && chapters.length > 0) {
+    console.log('[Home Debug] First chapter structure:', JSON.stringify(chapters[0], null, 2));
+    console.log('[Home Debug] Chapter content property:', chapters[0].content);
+    console.log('[Home Debug] Chapter keys:', Object.keys(chapters[0]));
+  }
 
   const createStoryMutation = useMutation({
     mutationFn: async (storyData: { genre: string; voice: string; title: string }) => {
