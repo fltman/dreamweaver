@@ -13,6 +13,7 @@ export default function Home() {
   const [selectedGenre, setSelectedGenre] = useState<string>();
   const [selectedVoice, setSelectedVoice] = useState<string>();
   const [currentStory, setCurrentStory] = useState<Story>();
+  const queryClient = useQueryClient();
 
   const { data: chapters, isLoading: chaptersLoading, error: chaptersError, isSuccess: chaptersSuccess } = useQuery<Chapter[]>({
     queryKey: ['/api/stories', currentStory?.id.toString(), 'chapters'],
