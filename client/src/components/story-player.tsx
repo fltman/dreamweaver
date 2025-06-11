@@ -135,7 +135,7 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 <span className="ml-3 text-muted-foreground">Crafting your story...</span>
               </div>
-            ) : currentChapter ? (
+            ) : currentChapter && currentChapter.content ? (
               <div className="story-content text-foreground/90 leading-relaxed">
                 {currentChapter.content.split('\n').map((paragraph, index) => (
                   <p key={index} className="mb-6 last:mb-0">
