@@ -44,14 +44,21 @@ export default function BackgroundMusic({ onVolumeChange, storyAudioPlaying = fa
     const audio = audioRef.current;
     if (!audio || !isUserPlaying) return;
 
+    console.log('[BackgroundMusic] Story audio state changed:', storyAudioPlaying);
+
     if (storyAudioPlaying) {
       console.log('[BackgroundMusic] Pausing for story audio');
       audio.pause();
     } else {
-      console.log('[BackgroundMusic] Resuming after story audio');
-      audio.play().catch(error => {
-        console.error('[BackgroundMusic] Failed to resume:', error);
-      });
+      console.log('[BackgroundMusic] Story audio stopped, resuming background music');
+      // Small delay to ensure story audio has fully stopped
+      setTimeout(() => {
+        if (isUserPlaying && !storyAudioPlaying) {
+          audio.play().catch(error => {
+            console.error('[BackgroundMusic] Failed to resume:', error);
+          });
+        }
+      }, 500);
     }
   }, [storyAudioPlaying, isUserPlaying]);
 
