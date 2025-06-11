@@ -1,0 +1,193 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 4%);
+  --foreground: hsl(0, 0%, 97%);
+  --muted: hsl(240, 4%, 16%);
+  --muted-foreground: hsl(240, 5%, 65%);
+  --popover: hsl(0, 0%, 4%);
+  --popover-foreground: hsl(0, 0%, 97%);
+  --card: hsl(240, 4%, 10%);
+  --card-foreground: hsl(0, 0%, 97%);
+  --border: hsl(240, 4%, 16%);
+  --input: hsl(240, 4%, 16%);
+  --primary: hsl(270, 67%, 70%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(240, 4%, 16%);
+  --secondary-foreground: hsl(0, 0%, 97%);
+  --accent: hsl(240, 4%, 16%);
+  --accent-foreground: hsl(0, 0%, 97%);
+  --destructive: hsl(0, 63%, 31%);
+  --destructive-foreground: hsl(0, 0%, 97%);
+  --ring: hsl(270, 67%, 70%);
+  --radius: 1rem;
+  
+  /* Custom sleep theme colors */
+  --space-black: hsl(0, 0%, 4%);
+  --charcoal: hsl(0, 0%, 10%);
+  --moonlight: hsl(218, 17%, 28%);
+  --dream-purple: hsl(270, 67%, 70%);
+  --warm-white: hsl(210, 40%, 98%);
+}
+
+.dark {
+  --background: hsl(0, 0%, 4%);
+  --foreground: hsl(0, 0%, 97%);
+  --muted: hsl(240, 4%, 16%);
+  --muted-foreground: hsl(240, 5%, 65%);
+  --popover: hsl(0, 0%, 4%);
+  --popover-foreground: hsl(0, 0%, 97%);
+  --card: hsl(240, 4%, 10%);
+  --card-foreground: hsl(0, 0%, 97%);
+  --border: hsl(240, 4%, 16%);
+  --input: hsl(240, 4%, 16%);
+  --primary: hsl(270, 67%, 70%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(240, 4%, 16%);
+  --secondary-foreground: hsl(0, 0%, 97%);
+  --accent: hsl(240, 4%, 16%);
+  --accent-foreground: hsl(0, 0%, 97%);
+  --destructive: hsl(0, 63%, 31%);
+  --destructive-foreground: hsl(0, 0%, 97%);
+  --ring: hsl(270, 67%, 70%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    background-color: var(--space-black);
+    color: var(--warm-white);
+  }
+}
+
+@layer utilities {
+  .animate-breathe {
+    animation: breathe 3s ease-in-out infinite;
+  }
+  
+  .animate-gentle-pulse {
+    animation: gentle-pulse 2s ease-in-out infinite;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+  
+  @keyframes breathe {
+    0%, 100% { 
+      transform: scale(1); 
+      opacity: 0.7; 
+    }
+    50% { 
+      transform: scale(1.02); 
+      opacity: 1; 
+    }
+  }
+  
+  @keyframes gentle-pulse {
+    0%, 100% { 
+      opacity: 0.5; 
+    }
+    50% { 
+      opacity: 0.8; 
+    }
+  }
+  
+  @keyframes fadeIn {
+    0% { 
+      opacity: 0; 
+      transform: translateY(10px); 
+    }
+    100% { 
+      opacity: 1; 
+      transform: translateY(0); 
+    }
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--charcoal);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--moonlight);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dream-purple);
+}
+
+/* Custom selection */
+::selection {
+  background-color: var(--dream-purple);
+  color: var(--warm-white);
+}
+
+/* Story content styling */
+.story-content {
+  font-family: 'Crimson Text', serif;
+  line-height: 1.8;
+  font-size: 1.125rem;
+}
+
+.story-content p {
+  margin-bottom: 1.5rem;
+}
+
+/* Audio controls */
+.audio-controls {
+  backdrop-filter: blur(10px);
+}
+
+/* Choice buttons */
+.choice-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.choice-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(159, 122, 234, 0.2);
+}
+
+/* Genre selection buttons */
+.genre-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.genre-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(159, 122, 234, 0.15);
+}
+
+.genre-btn.selected {
+  border-color: var(--dream-purple);
+  box-shadow: 0 0 0 2px var(--dream-purple);
+}
+
+/* Voice selection buttons */
+.voice-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.voice-btn:hover {
+  background-color: rgba(159, 122, 234, 0.3);
+  border-color: rgba(159, 122, 234, 0.5);
+}
+
+.voice-btn.selected {
+  background-color: rgba(159, 122, 234, 0.3);
+  border-color: var(--dream-purple);
+  box-shadow: 0 0 0 2px var(--dream-purple);
+}
