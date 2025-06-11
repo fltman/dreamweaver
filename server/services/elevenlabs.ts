@@ -28,8 +28,8 @@ export async function convertTextToSpeech(
   const voice = VOICE_MAP[voiceId] || VOICE_MAP.sarah;
   console.log(`[ElevenLabs] Converting text to speech - Voice: ${voiceId} (${voice}), Text length: ${text.length}`);
   
-  // For very long texts (>2000 chars), use turbo model which is faster
-  const modelId = text.length > 2000 ? "eleven_turbo_v2_5" : "eleven_multilingual_v2";
+  // Always use multilingual v2 model for better quality
+  const modelId = "eleven_multilingual_v2";
   console.log(`[ElevenLabs] Using model: ${modelId}`);
   
   const requestBody = {
