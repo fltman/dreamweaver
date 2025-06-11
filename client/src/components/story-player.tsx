@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Settings } from "lucide-react";
 import { Story, Chapter, AppState } from "@/lib/types";
 import AudioPlayer from "./audio-player";
-import ChoiceSelector from "./choice-selector";
+import VoiceChoiceSelector from "./voice-choice-selector";
 import SettingsModal from "./settings-modal";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -166,13 +166,11 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
           )}
         </div>
 
-        {/* Choice Selection */}
+        {/* Voice Choice Selection */}
         {showChoices && currentChapter?.choices && (
-          <ChoiceSelector
+          <VoiceChoiceSelector
             choices={currentChapter.choices}
             onChoiceSelect={handleChoiceSelect}
-            timeoutSeconds={settings.choiceTimeout}
-            onTimeout={handleChoiceTimeout}
           />
         )}
       </div>
