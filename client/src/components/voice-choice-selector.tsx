@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { StoryChoice } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 interface VoiceChoiceSelectorProps {
   choices: StoryChoice[];
@@ -16,81 +17,93 @@ export default function VoiceChoiceSelector({
 }: VoiceChoiceSelectorProps) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [recognition, setRecognition] = useState<any>(null);
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [sleepTimeoutId, setSleepTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [silenceTimeoutId, setSilenceTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    // Check if browser supports speech recognition
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognitionInstance = new SpeechRecognition();
-      
-      recognitionInstance.continuous = true;
-      recognitionInstance.interimResults = true;
-      recognitionInstance.lang = 'en-US';
-      
-      recognitionInstance.onresult = (event: any) => {
-        let finalTranscript = '';
-        let interimTranscript = '';
+    // Initialize media recorder for audio recording
+    const initializeMediaRecorder = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
         
-        // Clear the sleep timeout - user is speaking
-        if (sleepTimeoutId) {
-          clearTimeout(sleepTimeoutId);
-          setSleepTimeoutId(null);
-        }
+        const recorder = new MediaRecorder(stream, {
+          mimeType: 'audio/webm;codecs=opus'
+        });
         
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            finalTranscript += result[0].transcript;
-          } else {
-            interimTranscript += result[0].transcript;
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            setAudioChunks(prev => [...prev, event.data]);
           }
-        }
+        };
         
-        const currentTranscript = finalTranscript || interimTranscript;
-        setTranscript(currentTranscript);
-        
-        // Check if transcript matches any choice
-        if (finalTranscript) {
-          // Clear any existing silence timeout
-          if (silenceTimeoutId) {
-            clearTimeout(silenceTimeoutId);
-            setSilenceTimeoutId(null);  
+        recorder.onstop = () => {
+          // Process audio chunks when recording stops
+          if (audioChunks.length > 0) {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
+            transcribeAudio(audioBlob);
+            setAudioChunks([]);
           }
-          
-          // Set a silence timeout to detect end of speech (2 seconds)
-          const newSilenceTimeout = setTimeout(() => {
-            console.log('Silence detected, processing speech:', finalTranscript);
-            checkForChoiceMatch(finalTranscript.toLowerCase().trim());
-          }, 2000);
-          setSilenceTimeoutId(newSilenceTimeout);
-        }
-      };
-      
-      recognitionInstance.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
-        setIsListening(false);
-      };
-      
-      recognitionInstance.onend = () => {
-        setIsListening(false);
-      };
-      
-      setRecognition(recognitionInstance);
-    }
+        };
+        
+        setMediaRecorder(recorder);
+      } catch (error) {
+        console.error('Failed to initialize media recorder:', error);
+      }
+    };
+    
+    initializeMediaRecorder();
+    
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
   }, []);
 
   // Auto-start listening when component mounts with longer delay
   useEffect(() => {
-    if (autoStartListening && recognition && !isListening) {
+    if (autoStartListening && mediaRecorder && !isListening) {
       setTimeout(() => {
         startListening();
       }, 3000); // Longer delay to ensure audio has finished completely
     }
-  }, [recognition, autoStartListening]);
+  }, [mediaRecorder, autoStartListening]);
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    try {
+      console.log('[VoiceChoice] Transcribing audio blob, size:', audioBlob.size);
+      
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'voice.webm');
+      
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Transcription failed: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      const transcribedText = result.text || '';
+      
+      console.log('[VoiceChoice] Transcription result:', transcribedText);
+      setTranscript(transcribedText);
+      
+      if (transcribedText.trim()) {
+        checkForChoiceMatch(transcribedText.toLowerCase().trim());
+      }
+    } catch (error) {
+      console.error('[VoiceChoice] Transcription error:', error);
+    }
+  };
 
   const checkForChoiceMatch = (spokenText: string) => {
     const normalizedText = spokenText.replace(/[^\w\s]/g, '').toLowerCase();
@@ -121,27 +134,53 @@ export default function VoiceChoiceSelector({
   };
 
   const startListening = () => {
-    if (recognition) {
-      setTranscript("");
-      setSelectedChoice(null);
-      recognition.start();
-      setIsListening(true);
+    if (!mediaRecorder || isListening || mediaRecorder.state !== 'inactive') return;
+    
+    setIsListening(true);
+    setIsRecording(true);
+    setTranscript("");
+    setSelectedChoice(null);
+    setAudioChunks([]); // Reset audio chunks
+    
+    try {
+      console.log('[VoiceChoice] Starting audio recording');
+      mediaRecorder.start(1000); // Collect data every 1 second
       
-      // Set 60-second sleep timeout - if no voice detected, assume user is asleep
+      // Set a 60-second timeout for sleep detection
+      if (sleepTimeoutId) {
+        clearTimeout(sleepTimeoutId);
+      }
+      
       const newSleepTimeout = setTimeout(() => {
-        console.log('No voice detected for 60 seconds - user appears to be asleep');
+        console.log('User seems to be asleep, stopping voice recording');
         stopListening();
         onChoiceSelect('__SLEEP__'); // Special signal to indicate sleep
-      }, 60000);
+      }, 60000); // 60 seconds
+      
       setSleepTimeoutId(newSleepTimeout);
+      
+      // Auto-stop recording after 5 seconds to get a voice sample
+      setTimeout(() => {
+        if (mediaRecorder.state === 'recording') {
+          console.log('[VoiceChoice] Auto-stopping recording after 5 seconds');
+          stopListening();
+        }
+      }, 5000);
+      
+    } catch (error) {
+      console.error('Error starting audio recording:', error);
+      setIsListening(false);
+      setIsRecording(false);
     }
   };
 
   const stopListening = () => {
-    if (recognition) {
-      recognition.stop();
-      setIsListening(false);
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      console.log('[VoiceChoice] Stopping audio recording');
+      mediaRecorder.stop();
     }
+    setIsListening(false);
+    setIsRecording(false);
     
     // Clear timeouts
     if (sleepTimeoutId) {
