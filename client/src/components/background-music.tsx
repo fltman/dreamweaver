@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Volume2, VolumeX } from "lucide-react";
+import { Volume2, VolumeX, Play, Pause } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 
 interface BackgroundMusicProps {
@@ -32,6 +32,7 @@ export default function BackgroundMusic({ isPlaying, onVolumeChange, storyAudioP
   const [volume, setVolume] = useState(30); // Lower default volume for background music
   const [isMuted, setIsMuted] = useState(false);
   const [currentTrack, setCurrentTrack] = useState(0);
+  const [isBackgroundPlaying, setIsBackgroundPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // Select random starting track
@@ -45,19 +46,27 @@ export default function BackgroundMusic({ isPlaying, onVolumeChange, storyAudioP
 
     console.log('[BackgroundMusic] State change - isPlaying:', isPlaying, 'storyAudioPlaying:', storyAudioPlaying);
 
-    if (isPlaying && !storyAudioPlaying) {
+    if (isPlaying && !storyAudioPlaying && !isBackgroundPlaying) {
       console.log('[BackgroundMusic] Starting background music');
-      // Small delay to ensure audio element is ready
-      setTimeout(() => {
-        audio.play().then(() => {
-          console.log('[BackgroundMusic] Successfully started playing');
-        }).catch(error => {
-          console.error('[BackgroundMusic] Failed to start:', error);
-        });
-      }, 100);
-    } else {
-      console.log('[BackgroundMusic] Pausing background music');
+      // Start playing immediately when story audio is not playing
+      audio.play().then(() => {
+        console.log('[BackgroundMusic] Successfully started playing');
+        setIsBackgroundPlaying(true);
+      }).catch(error => {
+        console.error('[BackgroundMusic] Failed to start:', error);
+        setIsBackgroundPlaying(false);
+      });
+    } else if (storyAudioPlaying && isBackgroundPlaying) {
+      console.log('[BackgroundMusic] Pausing for story audio');
       audio.pause();
+      setIsBackgroundPlaying(false);
+    } else if (!storyAudioPlaying && isPlaying && !isBackgroundPlaying) {
+      console.log('[BackgroundMusic] Resuming background music');
+      audio.play().then(() => {
+        setIsBackgroundPlaying(true);
+      }).catch(error => {
+        console.error('[BackgroundMusic] Failed to resume:', error);
+      });
     }
   }, [isPlaying, storyAudioPlaying]);
 
@@ -84,6 +93,22 @@ export default function BackgroundMusic({ isPlaying, onVolumeChange, storyAudioP
     setIsMuted(!isMuted);
   };
 
+  const toggleBackgroundMusic = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isBackgroundPlaying) {
+      audio.pause();
+      setIsBackgroundPlaying(false);
+    } else {
+      audio.play().then(() => {
+        setIsBackgroundPlaying(true);
+      }).catch(error => {
+        console.error('[BackgroundMusic] Manual play failed:', error);
+      });
+    }
+  };
+
   return (
     <div className="fixed bottom-4 right-4 bg-card/80 backdrop-blur-sm rounded-xl p-4 border border-border/50 space-y-3 min-w-[200px]">
       <audio
@@ -99,14 +124,24 @@ export default function BackgroundMusic({ isPlaying, onVolumeChange, storyAudioP
       
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">Background Music</span>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={toggleMute}
-          className="h-8 w-8 p-0"
-        >
-          {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-        </Button>
+        <div className="flex items-center space-x-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={toggleBackgroundMusic}
+            className="h-8 w-8 p-0"
+          >
+            {isBackgroundPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={toggleMute}
+            className="h-8 w-8 p-0"
+          >
+            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
       
       <div className="space-y-2">
