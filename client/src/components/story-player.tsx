@@ -89,13 +89,7 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
     }
   };
 
-  const handleChoiceTimeout = () => {
-    if (!currentChapter?.choices || currentChapter.choices.length === 0) return;
-    
-    // Randomly select a choice when user doesn't respond (likely asleep)
-    const randomChoice = currentChapter.choices[Math.floor(Math.random() * currentChapter.choices.length)];
-    handleChoiceSelect(randomChoice.id);
-  };
+
 
   return (
     <div className="flex-1 flex flex-col">
