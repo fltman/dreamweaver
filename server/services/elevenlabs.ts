@@ -26,6 +26,7 @@ export async function convertTextToSpeech(
   }
 
   const voice = VOICE_MAP[voiceId] || VOICE_MAP.sarah;
+  console.log(`[ElevenLabs] Converting text to speech - Voice: ${voiceId} (${voice}), Text length: ${text.length}`);
   
   const requestBody = {
     text: text,
@@ -39,6 +40,12 @@ export async function convertTextToSpeech(
   };
 
   try {
+    console.log(`[ElevenLabs] Making API request to: https://api.elevenlabs.io/v1/text-to-speech/${voice}`);
+    
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
       method: 'POST',
       headers: {
@@ -46,18 +53,32 @@ export async function convertTextToSpeech(
         'Content-Type': 'application/json',
         'xi-api-key': apiKey
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
+
+    console.log(`[ElevenLabs] Response status: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`[ElevenLabs] API error response: ${errorText}`);
       throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
     }
 
+    console.log(`[ElevenLabs] Converting response to buffer...`);
     const audioBuffer = await response.arrayBuffer();
-    return Buffer.from(audioBuffer);
+    const buffer = Buffer.from(audioBuffer);
+    console.log(`[ElevenLabs] Audio generated successfully, buffer size: ${buffer.length} bytes`);
+    
+    return buffer;
   } catch (error) {
-    console.error("ElevenLabs API error:", error);
+    if (error.name === 'AbortError') {
+      console.error("[ElevenLabs] Request timed out after 60 seconds");
+      throw new Error("Text-to-speech request timed out. Please try again.");
+    }
+    console.error("[ElevenLabs] API error:", error);
     throw new Error("Failed to convert text to speech: " + (error as Error).message);
   }
 }

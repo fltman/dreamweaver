@@ -56,31 +56,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/stories/:id/chapters", async (req, res) => {
     try {
       const storyId = parseInt(req.params.id);
+      console.log(`[Chapter Generation] Starting for story ${storyId}`);
+      
       const story = await storage.getStory(storyId);
       
       if (!story) {
+        console.log(`[Chapter Generation] Story ${storyId} not found`);
         return res.status(404).json({ message: "Story not found" });
       }
 
       const { previousChoice } = req.body;
+      console.log(`[Chapter Generation] Story found: ${story.title}, genre: ${story.genre}, voice: ${story.voice}`);
       
       // Generate story content using OpenAI
+      console.log(`[Chapter Generation] Generating story content with OpenAI...`);
       const generatedChapter = await generateStoryChapter(
         story.genre,
         story.currentChapter || 1,
         previousChoice,
         story.storyState
       );
+      console.log(`[Chapter Generation] Story content generated, length: ${generatedChapter.content.length} characters`);
 
       // Convert text to speech using ElevenLabs
+      console.log(`[Chapter Generation] Converting to speech with ElevenLabs...`);
       const audioBuffer = await convertTextToSpeech(
         generatedChapter.content,
         story.voice
       );
+      console.log(`[Chapter Generation] Audio conversion completed`);
 
       // Create a data URL for the audio
       const audioBase64 = audioBuffer.toString('base64');
       const audioUrl = `data:audio/mpeg;base64,${audioBase64}`;
+      console.log(`[Chapter Generation] Audio data URL created, base64 length: ${audioBase64.length}`);
 
       // Create chapter in storage
       const chapterData = {
@@ -93,16 +102,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validatedChapterData = insertChapterSchema.parse(chapterData);
       const chapter = await storage.createChapter(validatedChapterData);
+      console.log(`[Chapter Generation] Chapter created with ID: ${chapter.id}`);
 
       // Update story's current chapter and state
       await storage.updateStory(storyId, {
         currentChapter: (story.currentChapter || 1) + 1,
         storyState: { ...story.storyState, lastChapterId: chapter.id }
       });
+      console.log(`[Chapter Generation] Story updated, next chapter: ${(story.currentChapter || 1) + 1}`);
 
       res.json(chapter);
     } catch (error) {
-      console.error("Failed to generate chapter:", error);
+      console.error("[Chapter Generation] Error:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ message: "Invalid chapter data", errors: error.errors });
       } else {

@@ -56,6 +56,9 @@ Respond with JSON in this exact format:
   }
 
   try {
+    console.log(`[OpenAI] Generating ${genre} story chapter ${chapterNumber}`);
+    console.log(`[OpenAI] Previous choice: ${previousChoice || 'None (first chapter)'}`);
+    
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
@@ -67,14 +70,16 @@ Respond with JSON in this exact format:
       max_tokens: 2000
     });
 
+    console.log(`[OpenAI] Response received, parsing JSON...`);
     const result = JSON.parse(response.choices[0].message.content || "{}");
+    console.log(`[OpenAI] Story generated - Content length: ${result.content?.length || 0}, Choices: ${result.choices?.length || 0}`);
     
     return {
       content: result.content || "",
       choices: result.choices || []
     };
   } catch (error) {
-    console.error("OpenAI API error:", error);
+    console.error("[OpenAI] API error:", error);
     throw new Error("Failed to generate story chapter: " + (error as Error).message);
   }
 }
