@@ -183,9 +183,7 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
       </div>
 
       {/* Background Music */}
-      <BackgroundMusic 
-        storyAudioPlaying={isStoryAudioPlaying}
-      />
+      <BackgroundMusic />
 
       {/* Settings Modal */}
       <SettingsModal

@@ -5,7 +5,6 @@ import { Slider } from "@/components/ui/slider";
 
 interface BackgroundMusicProps {
   onVolumeChange?: (volume: number) => void;
-  storyAudioPlaying?: boolean;
 }
 
 const MUSIC_FILES = [
@@ -27,7 +26,7 @@ const MUSIC_FILES = [
   "Untitled (15).mp3"
 ];
 
-export default function BackgroundMusic({ onVolumeChange, storyAudioPlaying = false }: BackgroundMusicProps) {
+export default function BackgroundMusic({ onVolumeChange }: BackgroundMusicProps) {
   const [volume, setVolume] = useState(30); // Lower default volume for background music
   const [isMuted, setIsMuted] = useState(false);
   const [currentTrack, setCurrentTrack] = useState(0);
@@ -39,28 +38,7 @@ export default function BackgroundMusic({ onVolumeChange, storyAudioPlaying = fa
     setCurrentTrack(Math.floor(Math.random() * MUSIC_FILES.length));
   }, []);
 
-  // Auto-pause when story audio is playing, resume when it stops
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !isUserPlaying) return;
-
-    console.log('[BackgroundMusic] Story audio state changed:', storyAudioPlaying);
-
-    if (storyAudioPlaying) {
-      console.log('[BackgroundMusic] Pausing for story audio');
-      audio.pause();
-    } else {
-      console.log('[BackgroundMusic] Story audio stopped, resuming background music');
-      // Small delay to ensure story audio has fully stopped
-      setTimeout(() => {
-        if (isUserPlaying && !storyAudioPlaying) {
-          audio.play().catch(error => {
-            console.error('[BackgroundMusic] Failed to resume:', error);
-          });
-        }
-      }, 500);
-    }
-  }, [storyAudioPlaying, isUserPlaying]);
+  // Background music plays independently - no interaction with story audio
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -74,7 +52,7 @@ export default function BackgroundMusic({ onVolumeChange, storyAudioPlaying = fa
         handleTrackEnd();
         
         // Continue playing if music was playing
-        if (isUserPlaying && !storyAudioPlaying) {
+        if (isUserPlaying) {
           setTimeout(() => {
             audio.play().then(() => {
               console.log('[BackgroundMusic] Next track started playing');
@@ -91,7 +69,7 @@ export default function BackgroundMusic({ onVolumeChange, storyAudioPlaying = fa
         audio.removeEventListener('ended', handleTrackEndEvent);
       };
     }
-  }, [volume, isMuted, onVolumeChange, isUserPlaying, storyAudioPlaying, currentTrack]);
+  }, [volume, isMuted, onVolumeChange, isUserPlaying, currentTrack]);
 
   const handleTrackEnd = () => {
     // Move to next track, loop back to start when reaching end
