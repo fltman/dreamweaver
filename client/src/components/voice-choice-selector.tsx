@@ -8,22 +8,48 @@ interface VoiceChoiceSelectorProps {
   choices: StoryChoice[];
   onChoiceSelect: (choiceId: string) => void;
   autoStartListening?: boolean;
+  chapterNumber?: number;
+  voiceId?: string;
 }
 
-export default function VoiceChoiceSelector({ 
-  choices, 
+// Calculate sleep detection settings based on chapter number
+// Later chapters = user more likely to fall asleep = more patient detection
+function getSleepDetectionSettings(chapterNumber: number) {
+  if (chapterNumber <= 2) {
+    return { maxAttempts: 4, delayBetweenAttempts: 3000 };
+  } else if (chapterNumber <= 4) {
+    return { maxAttempts: 5, delayBetweenAttempts: 4000 };
+  } else if (chapterNumber <= 6) {
+    return { maxAttempts: 6, delayBetweenAttempts: 5000 };
+  } else {
+    return { maxAttempts: 8, delayBetweenAttempts: 6000 };
+  }
+}
+
+export default function VoiceChoiceSelector({
+  choices,
   onChoiceSelect,
-  autoStartListening = true
+  autoStartListening = true,
+  chapterNumber = 1,
+  voiceId = 'sarah'
 }: VoiceChoiceSelectorProps) {
+  const sleepSettings = getSleepDetectionSettings(chapterNumber);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [sleepTimeoutId, setSleepTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [silenceTimeoutId, setSilenceTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [attemptCount, setAttemptCount] = useState(0);
+  const [isReadingChoices, setIsReadingChoices] = useState(false);
+  const [choicesRead, setChoicesRead] = useState(false);
+  const [recorderReady, setRecorderReady] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
+  const choicesAudioRef = useRef<HTMLAudioElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+
+  // Getter for mediaRecorder that always returns the ref value
+  const mediaRecorder = mediaRecorderRef.current;
 
   const analyzeAudioForSpeech = async (audioBlob: Blob): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -122,23 +148,23 @@ export default function VoiceChoiceSelector({
                 const newAttemptCount = attemptCount + 1;
                 setAttemptCount(newAttemptCount);
                 
-                // Only trigger sleep detection after 4 consecutive failed attempts
-                if (newAttemptCount >= 4) {
-                  console.log('[VoiceChoice] Multiple failed attempts, user may be asleep');
+                // Trigger sleep detection after max attempts (varies by chapter)
+                if (newAttemptCount >= sleepSettings.maxAttempts) {
+                  console.log(`[VoiceChoice] ${newAttemptCount} failed attempts (chapter ${chapterNumber}), user may be asleep`);
                   onChoiceSelect('__SLEEP__');
                   return;
                 }
-                
+
                 // Continue listening for more attempts
                 setIsListening(false);
                 setIsRecording(false);
-                
-                // Auto-restart listening after a brief pause
+
+                // Auto-restart listening after delay (longer for later chapters)
                 setTimeout(() => {
                   if (!selectedChoice) {
                     startListening();
                   }
-                }, 3000);
+                }, sleepSettings.delayBetweenAttempts);
               }
             });
             
@@ -146,7 +172,8 @@ export default function VoiceChoiceSelector({
           }
         };
         
-        setMediaRecorder(recorder);
+        mediaRecorderRef.current = recorder;
+        setRecorderReady(true);
       } catch (error) {
         console.error('Failed to initialize media recorder:', error);
       }
@@ -161,14 +188,102 @@ export default function VoiceChoiceSelector({
     };
   }, []);
 
-  // Auto-start listening when component mounts with longer delay
-  useEffect(() => {
-    if (autoStartListening && mediaRecorder && !isListening) {
-      setTimeout(() => {
-        startListening();
-      }, 3000); // Longer delay to ensure audio has finished completely
+  // Read choices aloud when component mounts
+  const readChoicesAloud = async () => {
+    if (choicesRead || isReadingChoices || choices.length === 0) return;
+
+    setIsReadingChoices(true);
+    console.log('[VoiceChoice] Reading choices aloud...');
+
+    // Build the text to read
+    const choicesText = choices.map((choice, index) =>
+      `Choice ${index + 1}: ${choice.text}`
+    ).join('. ');
+
+    const fullText = `What happens next? ${choicesText}. Say one or two, or describe your choice.`;
+
+    try {
+      // Fetch streaming audio for choices
+      const response = await fetch('/api/audio/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: fullText, voiceId })
+      });
+
+      if (!response.ok) throw new Error('Failed to get audio');
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+
+      const chunks: Uint8Array[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+
+      const blob = new Blob(chunks, { type: 'audio/mpeg' });
+      const url = URL.createObjectURL(blob);
+
+      // Play the choices audio
+      const audio = new Audio(url);
+      choicesAudioRef.current = audio;
+
+      audio.onended = () => {
+        console.log('[VoiceChoice] Finished reading choices');
+        URL.revokeObjectURL(url);
+        setIsReadingChoices(false);
+        setChoicesRead(true);
+      };
+
+      audio.onerror = () => {
+        console.error('[VoiceChoice] Error playing choices audio');
+        URL.revokeObjectURL(url);
+        setIsReadingChoices(false);
+        setChoicesRead(true);
+      };
+
+      await audio.play();
+    } catch (error) {
+      console.error('[VoiceChoice] Error reading choices:', error);
+      setIsReadingChoices(false);
+      setChoicesRead(true); // Continue even if TTS fails
     }
-  }, [mediaRecorder, autoStartListening]);
+  };
+
+  // Read choices aloud when component mounts
+  useEffect(() => {
+    readChoicesAloud();
+  }, [choices]);
+
+  // Auto-start listening after choices have been read
+  useEffect(() => {
+    if (autoStartListening && choicesRead && !selectedChoice && recorderReady) {
+      // Small delay to ensure everything is ready
+      const startTimer = setTimeout(() => {
+        const recorder = mediaRecorderRef.current;
+        if (recorder && !isListening) {
+          if (recorder.state === 'inactive') {
+            console.log('[VoiceChoice] Choices read, auto-starting voice recording...');
+            startListening();
+          } else {
+            console.log('[VoiceChoice] MediaRecorder state is', recorder.state, '- will retry');
+            // Retry after another delay
+            setTimeout(() => {
+              if (!isListening && !selectedChoice) {
+                console.log('[VoiceChoice] Retry: starting voice recording...');
+                startListening();
+              }
+            }, 500);
+          }
+        } else {
+          console.log('[VoiceChoice] Waiting for recorder...', { recorder: !!recorder, isListening });
+        }
+      }, 300);
+
+      return () => clearTimeout(startTimer);
+    }
+  }, [recorderReady, autoStartListening, choicesRead, selectedChoice, isListening]);
 
   const transcribeAudio = async (audioBlob: Blob) => {
     try {
@@ -200,18 +315,18 @@ export default function VoiceChoiceSelector({
         const newAttemptCount = attemptCount + 1;
         setAttemptCount(newAttemptCount);
         
-        if (newAttemptCount >= 4) {
-          console.log('[VoiceChoice] Multiple failed attempts, user may be asleep');
+        if (newAttemptCount >= sleepSettings.maxAttempts) {
+          console.log(`[VoiceChoice] ${newAttemptCount} failed attempts (chapter ${chapterNumber}), user may be asleep`);
           onChoiceSelect('__SLEEP__');
           return;
         }
-        
-        // Auto-restart listening after a brief pause
+
+        // Auto-restart listening after delay (longer for later chapters)
         setTimeout(() => {
           if (!selectedChoice) {
             startListening();
           }
-        }, 3000);
+        }, sleepSettings.delayBetweenAttempts);
       }
     } catch (error) {
       console.error('[VoiceChoice] Transcription error:', error);
@@ -221,83 +336,118 @@ export default function VoiceChoiceSelector({
     }
   };
 
-  const checkForChoiceMatch = (spokenText: string) => {
-    const normalizedText = spokenText.replace(/[^\w\s]/g, '').toLowerCase();
-    
-    // Check for exact matches or key words in choices
-    for (const choice of choices) {
-      const choiceText = choice.text.toLowerCase();
-      const choiceWords = choiceText.split(' ').filter(word => word.length > 2);
-      
-      // Check if any significant words from the choice appear in the spoken text
-      const hasKeyWords = choiceWords.some(word => 
-        normalizedText.includes(word.toLowerCase())
-      );
-      
-      // Check for number-based selection (e.g., "one", "first", "two", "second")
-      const choiceIndex = choices.indexOf(choice);
-      const numberWords = ['first', 'one', '1', 'second', 'two', '2', 'third', 'three', '3'];
-      const hasNumberMatch = numberWords.slice(choiceIndex * 2, choiceIndex * 2 + 2).some(num => 
-        normalizedText.includes(num)
-      );
-      
-      if (hasKeyWords || hasNumberMatch) {
-        // Clear all timeouts when voice choice is detected
-        if (sleepTimeoutId) {
-          clearTimeout(sleepTimeoutId);
-          setSleepTimeoutId(null);
+  const checkForChoiceMatch = async (spokenText: string) => {
+    console.log('[VoiceChoice] Asking LLM to interpret:', spokenText);
+
+    try {
+      // Use LLM to interpret the user's response
+      const response = await fetch('/api/interpret-choice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: spokenText, choices })
+      });
+
+      if (!response.ok) {
+        console.error('[VoiceChoice] API error:', response.status, response.statusText);
+        throw new Error(`API returned ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('[VoiceChoice] LLM interpretation:', result);
+
+      if (result.choiceId) {
+        const choice = choices.find(c => c.id === result.choiceId);
+        if (choice) {
+          // Clear all timeouts when voice choice is detected
+          if (sleepTimeoutId) {
+            clearTimeout(sleepTimeoutId);
+            setSleepTimeoutId(null);
+          }
+          if (silenceTimeoutId) {
+            clearTimeout(silenceTimeoutId);
+            setSilenceTimeoutId(null);
+          }
+
+          setAttemptCount(0);
+          setSelectedChoice(choice.id);
+          setTimeout(() => onChoiceSelect(choice.id), 1000);
+          return;
         }
-        if (silenceTimeoutId) {
-          clearTimeout(silenceTimeoutId);
-          setSilenceTimeoutId(null);
-        }
-        
-        setAttemptCount(0); // Reset attempt count on successful match
-        setSelectedChoice(choice.id);
-        setTimeout(() => onChoiceSelect(choice.id), 1000); // Small delay to show selection
+      }
+
+      // No match - re-read choices and try again
+      console.log('[VoiceChoice] No choice matched, re-reading choices...');
+      const newAttemptCount = attemptCount + 1;
+      setAttemptCount(newAttemptCount);
+
+      if (newAttemptCount >= sleepSettings.maxAttempts) {
+        console.log(`[VoiceChoice] ${newAttemptCount} failed attempts (chapter ${chapterNumber}), user may be asleep`);
+        onChoiceSelect('__SLEEP__');
         return;
       }
+
+      // Re-read the choices and then listen again
+      setChoicesRead(false);
+      setIsReadingChoices(false);
+      setTimeout(() => {
+        readChoicesAloud();
+      }, 1000);
+
+    } catch (error) {
+      console.error('[VoiceChoice] Error interpreting choice:', error);
+      // On error, just retry listening
+      setTimeout(() => {
+        if (!selectedChoice && mediaRecorder) {
+          startListening();
+        }
+      }, sleepSettings.delayBetweenAttempts);
     }
-    
-    // No choice matched - increment attempt count and continue listening
-    console.log('[VoiceChoice] No choice matched for:', spokenText);
-    const newAttemptCount = attemptCount + 1;
-    setAttemptCount(newAttemptCount);
-    
-    if (newAttemptCount >= 4) {
-      console.log('[VoiceChoice] Multiple failed attempts, user may be asleep');
-      onChoiceSelect('__SLEEP__');
-      return;
-    }
-    
-    // Auto-restart listening after a brief pause
-    setTimeout(() => {
-      if (!selectedChoice) {
-        startListening();
-      }
-    }, 3000);
   };
 
   const startListening = () => {
-    if (!mediaRecorder || isListening || mediaRecorder.state !== 'inactive') return;
-    
+    const recorder = mediaRecorderRef.current;
+
+    if (!recorder) {
+      console.log('[VoiceChoice] Cannot start - no mediaRecorder');
+      return;
+    }
+
+    // If already listening, don't start again
+    if (isListening) {
+      console.log('[VoiceChoice] Already listening, skipping start');
+      return;
+    }
+
+    // If recorder is not inactive, try to stop it first
+    if (recorder.state !== 'inactive') {
+      console.log('[VoiceChoice] MediaRecorder state is', recorder.state, '- stopping first');
+      try {
+        recorder.stop();
+      } catch (e) {
+        console.log('[VoiceChoice] Could not stop recorder:', e);
+      }
+      // Retry after a short delay
+      setTimeout(() => startListening(), 200);
+      return;
+    }
+
     setIsListening(true);
     setIsRecording(true);
     setTranscript("");
-    setSelectedChoice(null);
-    
+
     try {
       console.log('[VoiceChoice] Starting audio recording');
-      mediaRecorder.start(1000); // Collect data every 1 second
-      
+      recorder.start(1000); // Collect data every 1 second
+
       // Auto-stop recording after 5 seconds to get a voice sample
       setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
+        const currentRecorder = mediaRecorderRef.current;
+        if (currentRecorder && currentRecorder.state === 'recording') {
           console.log('[VoiceChoice] Auto-stopping recording after 5 seconds');
           stopListening();
         }
       }, 5000);
-      
+
     } catch (error) {
       console.error('Error starting audio recording:', error);
       setIsListening(false);
@@ -306,13 +456,14 @@ export default function VoiceChoiceSelector({
   };
 
   const stopListening = () => {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state === 'recording') {
       console.log('[VoiceChoice] Stopping audio recording');
-      mediaRecorder.stop();
+      recorder.stop();
     }
     setIsListening(false);
     setIsRecording(false);
-    
+
     // Clear timeouts
     if (sleepTimeoutId) {
       clearTimeout(sleepTimeoutId);
@@ -343,50 +494,77 @@ export default function VoiceChoiceSelector({
     <div className="space-y-6 pt-6 animate-fade-in">
       <div className="text-center space-y-4">
         <h3 className="text-2xl font-light">What happens next?</h3>
-        <p className="text-muted-foreground">Speak your choice (using AI transcription) or tap to select</p>
+        <p className="text-muted-foreground">
+          {isListening ? "Just say your choice... or drift off to sleep" : "Speak your choice or tap to select"}
+        </p>
       </div>
-      
-      {/* Voice Control Section */}
+
+      {/* Voice Status - Always visible */}
       <div className="text-center space-y-4 p-6 bg-card/30 rounded-2xl border border-border/50">
-        <div className="flex items-center justify-center space-x-4">
-          <Button
-            onClick={isListening ? stopListening : startListening}
-            variant={isListening ? "destructive" : "default"}
-            size="lg"
-            className="rounded-full"
-          >
-            {isListening ? (
-              <>
-                <MicOff className="w-5 h-5 mr-2" />
-                {isRecording ? "Stop Recording" : "Stop Listening"}
-              </>
-            ) : (
-              <>
-                <Mic className="w-5 h-5 mr-2" />
-                Start Voice Command
-              </>
-            )}
-          </Button>
-        </div>
-        
-        {isListening && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-center space-x-2">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              <span className="text-sm text-muted-foreground">
-                {isRecording ? "Recording your voice..." : "Processing..."}
-              </span>
-            </div>
-            {attemptCount > 0 && (
-              <div className="text-xs text-yellow-500">
-                Sleep detection: {attemptCount}/4 attempts
+        {isReadingChoices ? (
+          <div className="space-y-4">
+            {/* Reading choices indicator */}
+            <div className="flex justify-center">
+              <div className="w-16 h-16 bg-primary/30 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-primary/50 rounded-full animate-pulse"></div>
               </div>
-            )}
-            {transcript && (
-              <p className="text-sm italic bg-muted/50 p-2 rounded">
-                "{transcript}"
+            </div>
+            <div className="space-y-2">
+              <span className="text-lg text-primary">Reading your choices...</span>
+              <p className="text-sm text-muted-foreground">Listen carefully, then respond</p>
+            </div>
+          </div>
+        ) : isListening ? (
+          <div className="space-y-4">
+            {/* Large pulsing mic indicator */}
+            <div className="flex justify-center">
+              <div className="relative">
+                <div className="w-16 h-16 bg-primary/20 rounded-full animate-ping absolute"></div>
+                <div className="w-16 h-16 bg-primary/40 rounded-full flex items-center justify-center relative">
+                  <Mic className="w-8 h-8 text-primary animate-pulse" />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <span className="text-lg text-primary">
+                {isRecording ? "Listening..." : "Processing..."}
+              </span>
+              <p className="text-sm text-muted-foreground">
+                Say "one" or "two", or describe your choice
               </p>
-            )}
+              {attemptCount > 0 && (
+                <div className="text-xs text-muted-foreground/70">
+                  No response detected ({attemptCount}/{sleepSettings.maxAttempts})
+                </div>
+              )}
+              {transcript && (
+                <p className="text-sm italic bg-muted/50 p-2 rounded mt-2">
+                  Heard: "{transcript}"
+                </p>
+              )}
+            </div>
+            {/* Small stop button */}
+            <Button
+              onClick={stopListening}
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground"
+            >
+              <MicOff className="w-3 h-3 mr-1" />
+              Stop listening
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Voice recording stopped</p>
+            <Button
+              onClick={startListening}
+              variant="outline"
+              size="sm"
+            >
+              <Mic className="w-4 h-4 mr-2" />
+              Resume listening
+            </Button>
           </div>
         )}
       </div>

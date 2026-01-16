@@ -1,3 +1,5 @@
+import { Response } from "express";
+
 interface ElevenLabsVoice {
   voice_id: string;
   name: string;
@@ -6,9 +8,93 @@ interface ElevenLabsVoice {
 
 const VOICE_MAP: Record<string, string> = {
   sarah: "BL7YSL1bAkmW8U0JnU8o", // High quality female voice
-  david: "wgHvco1wiREKN0BdyVx5", // High quality male voice  
+  david: "wgHvco1wiREKN0BdyVx5", // High quality male voice
   luna: "BL7YSL1bAkmW8U0JnU8o", // High quality female voice
 };
+
+// Stream audio directly to client as it's generated
+export async function streamTextToSpeech(
+  text: string,
+  voiceId: string,
+  res: Response,
+  options: {
+    stability?: number;
+    similarity_boost?: number;
+    style?: number;
+    speed?: number;
+  } = {}
+): Promise<void> {
+  const apiKey = process.env.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY_ENV_VAR || "default_key";
+
+  if (!apiKey || apiKey === "default_key") {
+    throw new Error("ElevenLabs API key not found in environment variables");
+  }
+
+  const voice = VOICE_MAP[voiceId] || VOICE_MAP.sarah;
+  // Slower speed (0.7) for bedtime stories - more soothing
+  const speed = options.speed || 0.7;
+  console.log(`[ElevenLabs Stream] Starting stream - Voice: ${voiceId} (${voice}), Speed: ${speed}, Text length: ${text.length}`);
+
+  const modelId = "eleven_multilingual_v2";
+
+  const requestBody = {
+    text: text,
+    model_id: modelId,
+    voice_settings: {
+      stability: options.stability || 0.75,
+      similarity_boost: options.similarity_boost || 0.75,
+      style: options.style || 0.25,
+      use_speaker_boost: true,
+      speed: speed
+    }
+  };
+
+  try {
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}/stream`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': apiKey
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[ElevenLabs Stream] API error: ${errorText}`);
+      throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+    }
+
+    if (!response.body) {
+      throw new Error("No response body from ElevenLabs");
+    }
+
+    // Set headers for streaming audio
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Cache-Control', 'no-cache');
+
+    // Pipe the stream directly to the response
+    const reader = response.body.getReader();
+    let totalBytes = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      totalBytes += value.length;
+      res.write(Buffer.from(value));
+    }
+
+    console.log(`[ElevenLabs Stream] Stream complete, total bytes: ${totalBytes}`);
+    res.end();
+
+  } catch (error: any) {
+    console.error("[ElevenLabs Stream] Error:", error);
+    throw error;
+  }
+}
 
 export async function convertTextToSpeech(
   text: string,
@@ -17,21 +103,24 @@ export async function convertTextToSpeech(
     stability?: number;
     similarity_boost?: number;
     style?: number;
+    speed?: number;
   } = {}
 ): Promise<Buffer> {
   const apiKey = process.env.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY_ENV_VAR || "default_key";
-  
+
   if (!apiKey || apiKey === "default_key") {
     throw new Error("ElevenLabs API key not found in environment variables");
   }
 
   const voice = VOICE_MAP[voiceId] || VOICE_MAP.sarah;
-  console.log(`[ElevenLabs] Converting text to speech - Voice: ${voiceId} (${voice}), Text length: ${text.length}`);
-  
+  // Slower speed (0.7) for bedtime stories - more soothing
+  const speed = options.speed || 0.7;
+  console.log(`[ElevenLabs] Converting text to speech - Voice: ${voiceId} (${voice}), Speed: ${speed}, Text length: ${text.length}`);
+
   // Always use multilingual v2 model for better quality
   const modelId = "eleven_multilingual_v2";
   console.log(`[ElevenLabs] Using model: ${modelId}`);
-  
+
   const requestBody = {
     text: text,
     model_id: modelId,
@@ -39,7 +128,8 @@ export async function convertTextToSpeech(
       stability: options.stability || 0.75,
       similarity_boost: options.similarity_boost || 0.75,
       style: options.style || 0.25,
-      use_speaker_boost: true
+      use_speaker_boost: true,
+      speed: speed
     }
   };
 

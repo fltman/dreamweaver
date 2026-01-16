@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Settings } from "lucide-react";
 import { Story, Chapter, AppState } from "@/lib/types";
 import AudioPlayer from "./audio-player";
+import StreamingAudioPlayer from "./streaming-audio-player";
 import VoiceChoiceSelector from "./voice-choice-selector";
 import SettingsModal from "./settings-modal";
 import BackgroundMusic from "./background-music";
@@ -19,12 +20,14 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
   const [showChoices, setShowChoices] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isStoryAudioPlaying, setIsStoryAudioPlaying] = useState(false);
+  const [preGenStatus, setPreGenStatus] = useState<Record<string, 'pending' | 'done' | 'error'>>({});
   const [settings, setSettings] = useState({
     speechSpeed: 1.0,
     voiceTone: 'normal',
     choiceTimeout: 45,
     fadeOut: true
   });
+  const preGenStartedRef = useRef<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -57,12 +60,75 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
     }
   });
 
+  // Mutation for creating chapter from pre-generated cache (with streaming audio)
+  const createFromCacheMutation = useMutation({
+    mutationFn: async ({ storyId, choiceId, choiceText, chapterNumber }: {
+      storyId: number;
+      choiceId: string;
+      choiceText: string;
+      chapterNumber: number;
+    }) => {
+      const response = await apiRequest('POST', `/api/stories/${storyId}/chapters/from-cache`, {
+        choiceId,
+        choiceText,
+        chapterNumber
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/stories/${story.id}/chapters`] });
+    }
+  });
+
+  // Pre-generate next chapter text for both choices while current chapter plays
+  const preGenerateChoices = async (choices: Array<{ id: string; text: string; description: string }>, nextChapterNumber: number) => {
+    const preGenKey = `${story.id}-${nextChapterNumber}`;
+
+    // Prevent duplicate pre-generation
+    if (preGenStartedRef.current === preGenKey) {
+      console.log('[PreGen] Already started for', preGenKey);
+      return;
+    }
+    preGenStartedRef.current = preGenKey;
+
+    console.log(`[PreGen] Starting pre-generation for ${choices.length} choices, chapter ${nextChapterNumber}`);
+
+    // Pre-generate both choices in parallel
+    const promises = choices.map(async (choice) => {
+      const statusKey = `${nextChapterNumber}-${choice.id}`;
+      setPreGenStatus(prev => ({ ...prev, [statusKey]: 'pending' }));
+
+      try {
+        await apiRequest('POST', `/api/stories/${story.id}/pregenerate`, {
+          choiceText: choice.text,
+          choiceId: choice.id,
+          chapterNumber: nextChapterNumber
+        });
+        setPreGenStatus(prev => ({ ...prev, [statusKey]: 'done' }));
+        console.log(`[PreGen] Done for choice ${choice.id}`);
+      } catch (error) {
+        console.error(`[PreGen] Error for choice ${choice.id}:`, error);
+        setPreGenStatus(prev => ({ ...prev, [statusKey]: 'error' }));
+      }
+    });
+
+    await Promise.all(promises);
+  };
+
   useEffect(() => {
     if (!currentChapter && !generateChapterMutation.isPending) {
       // Generate first chapter only if not already generating
       generateChapterMutation.mutate({ storyId: story.id });
     }
   }, [story.id]); // Remove currentChapter from dependencies to prevent re-triggering
+
+  // Pre-generate next chapter choices when audio starts playing
+  useEffect(() => {
+    if (isStoryAudioPlaying && currentChapter?.choices && currentChapter.choices.length > 0) {
+      const nextChapterNumber = currentChapter.chapterNumber + 1;
+      preGenerateChoices(currentChapter.choices, nextChapterNumber);
+    }
+  }, [isStoryAudioPlaying, currentChapter?.id]);
 
   const handlePlaybackComplete = () => {
     if (currentChapter?.choices && currentChapter.choices.length > 0) {
@@ -75,7 +141,7 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
 
   const handleChoiceSelect = (choiceId: string) => {
     if (!currentChapter) return;
-    
+
     // Handle sleep signal - user appears to be asleep
     if (choiceId === '__SLEEP__') {
       console.log('User appears to be asleep - stopping story');
@@ -83,21 +149,27 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
       onBack(); // Return to home screen when user falls asleep
       return;
     }
-    
+
     const choice = currentChapter.choices.find(c => c.id === choiceId);
-    if (choice && !generateChapterMutation.isPending) {
+    const nextChapterNumber = currentChapter.chapterNumber + 1;
+
+    if (choice && !createFromCacheMutation.isPending && !generateChapterMutation.isPending) {
       // Update current chapter with user choice
       updateChapterMutation.mutate({
         chapterId: currentChapter.id,
         userChoice: choice.text
       });
 
-      // Generate next chapter only if not already generating
-      generateChapterMutation.mutate({
+      // Use pre-generated content from cache (audio will be streamed)
+      createFromCacheMutation.mutate({
         storyId: story.id,
-        previousChoice: choice.text
+        choiceId: choice.id,
+        choiceText: choice.text,
+        chapterNumber: nextChapterNumber
       });
 
+      // Reset pre-generation tracking for next chapter
+      preGenStartedRef.current = null;
       setShowChoices(false);
     }
   };
@@ -143,10 +215,12 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
         {/* Story Text Area */}
         <div className="flex-1 space-y-6">
           <div className="bg-card/30 rounded-2xl p-8 border border-border">
-            {generateChapterMutation.isPending ? (
+            {(generateChapterMutation.isPending || createFromCacheMutation.isPending) ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                <span className="ml-3 text-muted-foreground">Crafting your story...</span>
+                <span className="ml-3 text-muted-foreground">
+                  {createFromCacheMutation.isPending ? 'Preparing your story...' : 'Crafting your story...'}
+                </span>
               </div>
             ) : currentChapter && currentChapter.content ? (
               <div className="text-center py-12 text-muted-foreground">
@@ -162,14 +236,24 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
             )}
           </div>
 
-          {/* Audio Player */}
-          {currentChapter?.audioUrl && (
-            <AudioPlayer
-              audioUrl={currentChapter.audioUrl}
-              onPlaybackComplete={handlePlaybackComplete}
-              onPlayingChange={setIsStoryAudioPlaying}
-              autoPlay={true}
-            />
+          {/* Audio Player - use streaming for chapters without pre-rendered audio */}
+          {currentChapter?.content && (
+            currentChapter.audioUrl ? (
+              <AudioPlayer
+                audioUrl={currentChapter.audioUrl}
+                onPlaybackComplete={handlePlaybackComplete}
+                onPlayingChange={setIsStoryAudioPlaying}
+                autoPlay={true}
+              />
+            ) : (
+              <StreamingAudioPlayer
+                text={currentChapter.content}
+                voiceId={story.voice}
+                onPlaybackComplete={handlePlaybackComplete}
+                onPlayingChange={setIsStoryAudioPlaying}
+                autoPlay={true}
+              />
+            )
           )}
         </div>
 
@@ -178,6 +262,8 @@ export default function StoryPlayer({ story, currentChapter, onBack }: StoryPlay
           <VoiceChoiceSelector
             choices={currentChapter.choices}
             onChoiceSelect={handleChoiceSelect}
+            chapterNumber={currentChapter.chapterNumber}
+            voiceId={story.voice}
           />
         )}
       </div>

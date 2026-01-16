@@ -1,8 +1,14 @@
 import OpenAI from "openai";
 
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || "default_key",
-  timeout: 60000 // 60 second timeout
+// Use OpenRouter for story generation with Claude Sonnet 4.5
+const openrouter = new OpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY || "default_key",
+  timeout: 60000, // 60 second timeout
+  defaultHeaders: {
+    "HTTP-Referer": "https://dreamweaver.app",
+    "X-Title": "Dreamweaver"
+  }
 });
 
 export interface StoryChapter {
@@ -57,30 +63,33 @@ Respond with JSON in this exact format:
   }
 
   try {
-    console.log(`[OpenAI] Generating ${genre} story chapter ${chapterNumber}`);
-    console.log(`[OpenAI] Previous choice: ${previousChoice || 'None (first chapter)'}`);
-    
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+    console.log(`[OpenRouter/Claude] Generating ${genre} story chapter ${chapterNumber}`);
+    console.log(`[OpenRouter/Claude] Previous choice: ${previousChoice || 'None (first chapter)'}`);
+
+    const response = await openrouter.chat.completions.create({
+      model: "anthropic/claude-sonnet-4.5",
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
+        { role: "user", content: userPrompt + "\n\nRespond ONLY with valid JSON, no other text." }
       ],
-      response_format: { type: "json_object" },
       temperature: 0.8,
       max_tokens: 2000
     });
 
-    console.log(`[OpenAI] Response received, parsing JSON...`);
-    const result = JSON.parse(response.choices[0].message.content || "{}");
-    console.log(`[OpenAI] Story generated - Content length: ${result.content?.length || 0}, Choices: ${result.choices?.length || 0}`);
-    
+    console.log(`[OpenRouter/Claude] Response received, parsing JSON...`);
+    const content = response.choices[0].message.content || "{}";
+    // Extract JSON from response (Claude may include markdown code blocks)
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : content;
+    const result = JSON.parse(jsonStr);
+    console.log(`[OpenRouter/Claude] Story generated - Content length: ${result.content?.length || 0}, Choices: ${result.choices?.length || 0}`);
+
     return {
       content: result.content || "",
       choices: result.choices || []
     };
   } catch (error) {
-    console.error("[OpenAI] API error:", error);
+    console.error("[OpenRouter/Claude] API error:", error);
     throw new Error("Failed to generate story chapter: " + (error as Error).message);
   }
 }

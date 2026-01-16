@@ -6,10 +6,29 @@ import fs from "fs";
 import multer from "multer";
 import { storage } from "./storage";
 import { generateStoryChapter } from "./services/openai";
-import { convertTextToSpeech, getAvailableVoices } from "./services/elevenlabs";
+import { convertTextToSpeech, getAvailableVoices, streamTextToSpeech } from "./services/elevenlabs";
 import { insertStorySchema, insertChapterSchema } from "@shared/schema";
 import { z } from "zod";
 import OpenAI from "openai";
+
+// In-memory cache for pre-generated chapters
+// Key format: "storyId-chapterNumber-choiceId"
+const preGeneratedChapters = new Map<string, {
+  content: string;
+  choices: Array<{ id: string; text: string; description: string }>;
+  generatedAt: number;
+}>();
+
+// Clean up old pre-generated chapters (older than 30 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of preGeneratedChapters.entries()) {
+    if (now - value.generatedAt > 30 * 60 * 1000) {
+      preGeneratedChapters.delete(key);
+      console.log(`[PreGen] Cleaned up expired cache: ${key}`);
+    }
+  }
+}, 5 * 60 * 1000); // Run every 5 minutes
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -254,6 +273,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to get chapters:", error);
       res.status(500).json({ message: "Failed to get chapters" });
+    }
+  });
+
+  // Pre-generate story text for a choice (no audio)
+  // Called while current chapter is playing to prepare next chapter
+  app.post("/api/stories/:id/pregenerate", async (req, res) => {
+    try {
+      const storyId = parseInt(req.params.id);
+      const { choiceText, choiceId, chapterNumber } = req.body;
+
+      console.log(`[PreGen] Starting pre-generation for story ${storyId}, chapter ${chapterNumber}, choice: ${choiceId}`);
+
+      const story = await storage.getStory(storyId);
+      if (!story) {
+        return res.status(404).json({ message: "Story not found" });
+      }
+
+      const cacheKey = `${storyId}-${chapterNumber}-${choiceId}`;
+
+      // Check if already cached
+      if (preGeneratedChapters.has(cacheKey)) {
+        console.log(`[PreGen] Cache hit for ${cacheKey}`);
+        return res.json({ cached: true, ...preGeneratedChapters.get(cacheKey) });
+      }
+
+      // Generate story content (text only, no audio)
+      const generatedChapter = await generateStoryChapter(
+        story.genre,
+        chapterNumber,
+        choiceText,
+        story.storyState
+      );
+
+      // Store in cache
+      const cacheEntry = {
+        content: generatedChapter.content,
+        choices: generatedChapter.choices,
+        generatedAt: Date.now()
+      };
+      preGeneratedChapters.set(cacheKey, cacheEntry);
+
+      console.log(`[PreGen] Cached ${cacheKey}, content length: ${generatedChapter.content.length}`);
+
+      res.json({ cached: false, ...cacheEntry });
+    } catch (error) {
+      console.error("[PreGen] Error:", error);
+      res.status(500).json({ message: "Failed to pre-generate chapter", error: (error as Error).message });
+    }
+  });
+
+  // Create chapter from pre-generated content with streaming audio
+  app.post("/api/stories/:id/chapters/from-cache", async (req, res) => {
+    try {
+      const storyId = parseInt(req.params.id);
+      const { choiceId, choiceText, chapterNumber } = req.body;
+
+      const story = await storage.getStory(storyId);
+      if (!story) {
+        return res.status(404).json({ message: "Story not found" });
+      }
+
+      const cacheKey = `${storyId}-${chapterNumber}-${choiceId}`;
+      let chapterContent;
+
+      // Check cache first
+      if (preGeneratedChapters.has(cacheKey)) {
+        console.log(`[FromCache] Using pre-generated content for ${cacheKey}`);
+        chapterContent = preGeneratedChapters.get(cacheKey)!;
+        preGeneratedChapters.delete(cacheKey); // Clean up after use
+      } else {
+        // Fall back to generating if not cached
+        console.log(`[FromCache] Cache miss for ${cacheKey}, generating...`);
+        const generated = await generateStoryChapter(
+          story.genre,
+          chapterNumber,
+          choiceText,
+          story.storyState
+        );
+        chapterContent = {
+          content: generated.content,
+          choices: generated.choices,
+          generatedAt: Date.now()
+        };
+      }
+
+      // Save chapter to database (without audio URL - audio will be streamed)
+      const chapterData = {
+        storyId: storyId,
+        chapterNumber: chapterNumber,
+        content: chapterContent.content,
+        audioUrl: null, // Audio will be streamed separately
+        choices: chapterContent.choices
+      };
+
+      const validatedChapterData = insertChapterSchema.parse(chapterData);
+      const chapter = await storage.createChapter(validatedChapterData);
+
+      // Update story's current chapter
+      await storage.updateStory(storyId, {
+        currentChapter: chapterNumber + 1,
+        storyState: { ...story.storyState, lastChapterId: chapter.id }
+      });
+
+      console.log(`[FromCache] Chapter ${chapter.id} created for story ${storyId}`);
+
+      res.json(chapter);
+    } catch (error) {
+      console.error("[FromCache] Error:", error);
+      res.status(500).json({ message: "Failed to create chapter", error: (error as Error).message });
+    }
+  });
+
+  // Interpret user's voice response to determine which choice they meant
+  app.post("/api/interpret-choice", async (req, res) => {
+    try {
+      const { transcript, choices } = req.body;
+
+      if (!transcript || !choices || choices.length === 0) {
+        return res.status(400).json({ message: "Missing transcript or choices" });
+      }
+
+      console.log(`[Interpret] Interpreting: "${transcript}" against ${choices.length} choices`);
+
+      const choicesText = choices.map((c: any, i: number) =>
+        `Choice ${i + 1} (id: ${c.id}): ${c.text}`
+      ).join('\n');
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are helping interpret a sleepy user's voice response to choose between story options.
+The user may say things like "one", "1", "first", "two", "2", "second", "to", "too", or describe their choice.
+Be generous in interpretation - if there's any reasonable match, pick that choice.
+Respond with ONLY a JSON object: {"choiceId": "choice_1"} or {"choiceId": "choice_2"} or {"choiceId": null} if truly no match.`
+          },
+          {
+            role: "user",
+            content: `User said: "${transcript}"\n\nAvailable choices:\n${choicesText}\n\nWhich choice did they mean?`
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 50
+      });
+
+      const content = response.choices[0].message.content || '{"choiceId": null}';
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const result = JSON.parse(jsonMatch ? jsonMatch[0] : '{"choiceId": null}');
+
+      console.log(`[Interpret] Result: ${result.choiceId}`);
+      res.json(result);
+    } catch (error) {
+      console.error("[Interpret] Error:", error);
+      res.status(500).json({ choiceId: null, error: (error as Error).message });
+    }
+  });
+
+  // Stream audio for chapter content
+  app.post("/api/audio/stream", async (req, res) => {
+    try {
+      const { text, voiceId } = req.body;
+
+      if (!text || !voiceId) {
+        return res.status(400).json({ message: "Missing text or voiceId" });
+      }
+
+      console.log(`[Audio Stream] Starting stream for ${text.length} chars, voice: ${voiceId}`);
+
+      await streamTextToSpeech(text, voiceId, res);
+    } catch (error) {
+      console.error("[Audio Stream] Error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to stream audio", error: (error as Error).message });
+      }
     }
   });
 

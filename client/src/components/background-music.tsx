@@ -27,16 +27,34 @@ const MUSIC_FILES = [
 ];
 
 export default function BackgroundMusic({ onVolumeChange }: BackgroundMusicProps) {
-  const [volume, setVolume] = useState(30); // Lower default volume for background music
+  const [volume, setVolume] = useState(5); // Start at 5% volume for sleepy ambiance
   const [isMuted, setIsMuted] = useState(false);
   const [currentTrack, setCurrentTrack] = useState(0);
   const [isUserPlaying, setIsUserPlaying] = useState(false);
+  const hasAutoStarted = useRef(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // Select random starting track
   useEffect(() => {
     setCurrentTrack(Math.floor(Math.random() * MUSIC_FILES.length));
   }, []);
+
+  // Auto-start music when component mounts (story starts)
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio && !hasAutoStarted.current) {
+      hasAutoStarted.current = true;
+      // Small delay to ensure audio is loaded
+      setTimeout(() => {
+        console.log('[BackgroundMusic] Auto-starting at 5% volume');
+        audio.volume = 0.05;
+        audio.play().catch(error => {
+          console.log('[BackgroundMusic] Auto-play blocked by browser, user interaction required:', error);
+        });
+        setIsUserPlaying(true);
+      }, 500);
+    }
+  }, [currentTrack]);
 
   // Background music plays independently - no interaction with story audio
 

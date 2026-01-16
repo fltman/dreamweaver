@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Moon } from "lucide-react";
+import { ArrowRight, Moon, Mic, Music } from "lucide-react";
 import StorySelector from "@/components/story-selector";
 import VoiceSelector from "@/components/voice-selector";
 import StoryPlayer from "@/components/story-player";
@@ -10,12 +10,48 @@ import { apiRequest } from "@/lib/queryClient";
 import BackgroundMusic from "@/components/background-music";
 
 export default function Home() {
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<'welcome' | 'player'>('welcome');
   const [selectedGenre, setSelectedGenre] = useState<string>();
   const [selectedVoice, setSelectedVoice] = useState<string>();
   const [currentStory, setCurrentStory] = useState<Story>();
   const [isKioskMode, setIsKioskMode] = useState(false);
+  const silentAudioRef = useRef<HTMLAudioElement>(null);
   const queryClient = useQueryClient();
+
+  // Check if permissions were previously granted (stored in localStorage)
+  useEffect(() => {
+    const granted = localStorage.getItem('dreamweaver-permissions-granted');
+    if (granted === 'true') {
+      setPermissionsGranted(true);
+    }
+  }, []);
+
+  const handleAcceptPermissions = async () => {
+    try {
+      // Request microphone permission
+      console.log('[Permissions] Requesting microphone access...');
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('[Permissions] Microphone access granted');
+
+      // Play silent audio to enable autoplay
+      if (silentAudioRef.current) {
+        silentAudioRef.current.volume = 0.01;
+        await silentAudioRef.current.play();
+        silentAudioRef.current.pause();
+        console.log('[Permissions] Audio autoplay enabled');
+      }
+
+      // Store permission state
+      localStorage.setItem('dreamweaver-permissions-granted', 'true');
+      setPermissionsGranted(true);
+    } catch (error) {
+      console.error('[Permissions] Error requesting permissions:', error);
+      // Still allow proceeding, features will degrade gracefully
+      localStorage.setItem('dreamweaver-permissions-granted', 'true');
+      setPermissionsGranted(true);
+    }
+  };
 
   // Handle escape key to exit kiosk mode
   useEffect(() => {
@@ -191,6 +227,65 @@ export default function Home() {
   };
 
   const isStartEnabled = selectedGenre && selectedVoice && !createStoryMutation.isPending;
+
+  // Permission consent screen
+  if (!permissionsGranted) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 py-8 animate-fade-in">
+        {/* Silent audio element to enable autoplay */}
+        <audio ref={silentAudioRef} src="/music/Untitled.mp3" preload="auto" />
+
+        <div className="max-w-md text-center space-y-8">
+          {/* Logo */}
+          <div className="w-32 h-32 mx-auto bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center animate-breathe">
+            <Moon className="text-5xl text-foreground" />
+          </div>
+
+          <div className="space-y-4">
+            <h1 className="text-4xl font-light">Welcome to Dreamweaver</h1>
+            <p className="text-lg text-muted-foreground leading-relaxed">
+              For the best experience, we need your permission to play soothing music and listen for your voice commands.
+            </p>
+          </div>
+
+          {/* Permission features */}
+          <div className="space-y-4 text-left bg-card/30 rounded-2xl p-6 border border-border">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
+                <Music className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-medium">Background Music</h3>
+                <p className="text-sm text-muted-foreground">Gentle ambient music to help you relax</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
+                <Mic className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-medium">Voice Commands</h3>
+                <p className="text-sm text-muted-foreground">Hands-free story choices while you drift off</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Accept button */}
+          <Button
+            onClick={handleAcceptPermissions}
+            size="lg"
+            className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/80 hover:to-primary text-primary-foreground font-medium py-6 rounded-full text-lg transition-all duration-300 transform hover:scale-105"
+          >
+            Enable & Continue
+          </Button>
+
+          <p className="text-xs text-muted-foreground">
+            You can change these settings anytime in your browser
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (currentScreen === 'player' && currentStory) {
     return (
